@@ -79,7 +79,7 @@ else:
                     try:
                         photo_bytes = base64.b64decode(photo_data_b64)
                         image = Image.open(io.BytesIO(photo_bytes))
-                        st.image(image, caption=f"Captured live at {timestamp}", use_column_width=True)
+                        st.image(image, caption=f"Captured live at {timestamp}", use_container_width=True)
                     except Exception as e:
                         st.error(f"Failed to load image data: {str(e)}")
                 else:
