@@ -5,29 +5,6 @@ from supabase import create_client, Client
 DATA_DIR = os.path.dirname(os.path.abspath(__file__))
 # DB_PATH = os.path.join(DATA_DIR, "compliance.db") # No longer needed
 
-STATION_TASKS = {
-    "Fry Station": [
-        "Oil filtered and vats scrubbed",
-        "Backsplash degreased (zero carbon buildup)",
-        "Floor drains cleared of debris"
-    ],
-    "Grill Station": [
-        "Grates scraped and bricked to silver",
-        "Drip pans emptied and sanitized",
-        "Under-grill sweeps completed"
-    ],
-    "Prep / Walk-in": [
-        "All open containers wrapped, dated, and labeled",
-        "Floors swept and mopped",
-        "Trash receptacles emptied and relined"
-    ],
-    "Line / Pass": [
-        "Pass counter sanitized & heat lamps wiped down",
-        "Refrigerated line drawers cleaned and restocked",
-        "Cutting boards scrubbed and flipped"
-    ]
-}
-
 @st.cache_resource
 def init_connection():
     url = st.secrets["supabase"]["URL"]
@@ -36,3 +13,53 @@ def init_connection():
 
 # Initialize Supabase client
 supabase: Client = init_connection()
+
+@st.cache_data(ttl=600)
+def fetch_station_tasks():
+    """
+    Fetches station tasks dynamically from the Supabase station_tasks table.
+    Returns a dictionary mapping station names to a list of tasks.
+    """
+    try:
+        response = supabase.table('station_tasks').select('station, task').execute()
+        tasks_data = response.data
+
+        # Group tasks by station
+        station_tasks = {}
+        for row in tasks_data:
+            station = row['station']
+            task = row['task']
+            if station not in station_tasks:
+                station_tasks[station] = []
+            station_tasks[station].append(task)
+
+        # Fallback to defaults if table is empty or missing
+        if not station_tasks:
+            raise ValueError("No tasks found in database")
+
+        return station_tasks
+
+    except Exception as e:
+        print(f"Warning: Failed to fetch tasks from Supabase ({e}). Using fallback defaults.")
+        return {
+            "Fry Station": [
+                "Oil filtered and vats scrubbed",
+                "Backsplash degreased (zero carbon buildup)",
+                "Floor drains cleared of debris"
+            ],
+            "Grill Station": [
+                "Grates scraped and bricked to silver",
+                "Drip pans emptied and sanitized",
+                "Under-grill sweeps completed"
+            ],
+            "Prep / Walk-in": [
+                "All open containers wrapped, dated, and labeled",
+                "Floors swept and mopped",
+                "Trash receptacles emptied and relined"
+            ],
+            "Line / Pass": [
+                "Pass counter sanitized & heat lamps wiped down",
+                "Refrigerated line drawers cleaned and restocked",
+                "Cutting boards scrubbed and flipped"
+            ]
+        }
