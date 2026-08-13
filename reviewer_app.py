@@ -3,6 +3,7 @@ import pandas as pd
 import sqlite3
 import io
 import os
+import base64
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from PIL import Image
@@ -28,7 +29,6 @@ def to_eastern_time(timestamp_val):
         return "N/A"
     try:
         if isinstance(timestamp_val, str):
-            # Clean ISO string if needed
             cleaned_str = timestamp_val.replace("Z", "+00:00")
             dt = datetime.fromisoformat(cleaned_str)
         elif isinstance(timestamp_val, datetime):
@@ -36,11 +36,9 @@ def to_eastern_time(timestamp_val):
         else:
             return str(timestamp_val)
 
-        # If naive (no timezone attached), assume UTC from DB
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=ZoneInfo("UTC"))
 
-        # Convert to Eastern Time (handles EST/EDT daylight saving automatically)
         eastern_dt = dt.astimezone(ZoneInfo("America/Detroit"))
         return eastern_dt.strftime("%Y-%m-%d %I:%M:%S %p")
     except Exception:
@@ -90,7 +88,6 @@ DB_PATH = os.path.join(DATA_DIR, "compliance.db")
 
 @st.cache_data(ttl=30)
 def fetch_logs():
-    # If Supabase credentials are configured in secrets
     if HAS_SUPABASE and "SUPABASE_URL" in st.secrets and "SUPABASE_KEY" in st.secrets:
         try:
             supabase: Client = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
@@ -99,7 +96,6 @@ def fetch_logs():
         except Exception as e:
             st.warning(f"Cloud DB fetch failed, falling back to local database: {e}")
 
-    # Fallback to local SQLite database
     if os.path.exists(DB_PATH):
         try:
             conn = sqlite3.connect(DB_PATH)
@@ -116,11 +112,11 @@ def fetch_logs():
                 data.append({
                     "id": row[0],
                     "timestamp": row,
-                    "employee_name": row[2],
-                    "station": row[3],
-                    "photo_data": row[4],
-                    "image_url": row[5],
-                    "status": row[6] if len(row) > 6 else "APPROVED"
+                    "employee_name": row,
+                    "station": row,
+                    "photo_data": row,
+                    "image_url": row,
+                    "status": row if len(row) > 6 else "APPROVED"
                 })
             return data
         except Exception as e:
@@ -144,7 +140,41 @@ col3.metric("Stations Audited", unique_stations)
 
 st.markdown("---")
 
-# 7. Visual Compliance Feed
+# 7. Image Display Helper
+def display_proof_image(image_url, photo_data, caption):
+    """Safely renders proof photos across all formats (URL, Base64 string, or raw bytes)."""
+    if image_url and isinstance(image_url, str) and (image_url.startswith("http://") or image_url.startswith("https://")):
+        st.image(image_url, caption=caption, use_container_width=True)
+        return
+
+    if photo_data:
+        if isinstance(photo_data, str) and (photo_data.startswith("http://") or photo_data.startswith("https://")):
+            st.image(photo_data, caption=caption, use_container_width=True)
+            return
+
+        if isinstance(photo_data, str):
+            try:
+                b64_str = photo_data.split("base64,") if "base64," in photo_data else photo_data
+                decoded = base64.b64decode(b64_str)
+                img = Image.open(io.BytesIO(decoded))
+                st.image(img, caption=caption, use_container_width=True)
+                return
+            except Exception:
+                st.image(photo_data, caption=caption, use_container_width=True)
+                return
+
+        if isinstance(photo_data, (bytes, bytearray)):
+            try:
+                img = Image.open(io.BytesIO(photo_data))
+                st.image(img, caption=caption, use_container_width=True)
+                return
+            except Exception:
+                st.image(photo_data, caption=caption, use_container_width=True)
+                return
+
+    st.warning("No photographic proof attached to this log entry.")
+
+# 8. Visual Compliance Feed
 st.subheader("📸 Visual Compliance Feed")
 
 for log in logs:
@@ -158,7 +188,7 @@ for log in logs:
     photo_data = log.get("photo_data")
 
     with st.expander(f"Log #{log_id}: {eastern_ts} | {employee} — {station}"):
-        data_col, photo_col = st.columns(2)
+        data_col, photo_col = st.columns()
 
         with data_col:
             st.write(f"**Timestamp (Eastern):** {eastern_ts}")
@@ -167,18 +197,5 @@ for log in logs:
             st.write(f"**Compliance Status:** ✅ {status}")
 
         with photo_col:
-            # 1. Cloud URL rendering (Supabase storage)
-            if image_url:
-                try:
-                    st.image(image_url, caption=f"Proof for {station} (Captured {eastern_ts})", use_container_width=True)
-                except Exception as e:
-                    st.error(f"Failed to render image URL: {e}")
-            # 2. Local byte rendering (SQLite BLOB)
-            elif photo_data:
-                try:
-                    img = Image.open(io.BytesIO(photo_data))
-                    st.image(img, caption=f"Proof for {station} (Captured {eastern_ts})", use_container_width=True)
-                except Exception as e:
-                    st.error(f"Failed to render image bytes: {e}")
-            else:
-                st.warning("No photographic proof attached to this log entry.")
+            caption_text = f"Proof for {station} (Captured {eastern_ts})"
+            display_proof_image(image_url, photo_data, caption_text)
