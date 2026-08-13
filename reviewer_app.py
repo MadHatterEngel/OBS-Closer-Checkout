@@ -158,7 +158,7 @@ for log in logs:
     photo_data = log.get("photo_data")
 
     with st.expander(f"Log #{log_id}: {eastern_ts} | {employee} — {station}"):
-        data_col, photo_col = st.columns()
+        data_col, photo_col = st.columns("")
 
         with data_col:
             st.write(f"**Timestamp (Eastern):** {eastern_ts}")
