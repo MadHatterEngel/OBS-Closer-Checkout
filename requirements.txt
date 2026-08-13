@@ -1,5 +1,5 @@
-streamlit==1.32.0
-pandas==2.2.1
-Pillow==10.2.0
-plotly==5.19.0
-supabase>=2.3.4
+streamlit
+pandas
+Pillow
+plotly
+supabase
