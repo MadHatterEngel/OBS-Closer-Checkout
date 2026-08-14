@@ -43,7 +43,7 @@ st.title("👁️ Manager Operations Review Dashboard")
 st.markdown("Remote verification portal for live shift closing logs and photographic proof.")
 st.markdown("---")
 
-tab1, tab2 = st.tabs(["📋 Review Logs", "🤖 AI Verification Setup"])
+tab1, tab2, tab3 = st.tabs(["📋 Review Logs", "🤖 AI Verification Setup", "⚙️ Station Configuration"])
 
 with tab1:
     def fetch_logs():
@@ -266,3 +266,85 @@ with tab2:
                         st.rerun()
                     except Exception as e:
                         st.error(f"Failed to save settings: {e}")
+
+with tab3:
+    st.subheader("⚙️ Station Requirements Management")
+    st.markdown("Modify, add, or remove check-out stations and their specific tasks. Changes instantly reflect on the closer application.")
+
+    # Reload fresh station tasks
+    station_tasks = fetch_station_tasks()
+
+    # Use expanders for existing stations
+    for station, tasks in station_tasks.items():
+        with st.expander(f"Station: {station}"):
+            st.markdown(f"**Current Tasks for {station}**")
+
+            # Display current tasks with a delete button for each
+            for i, task in enumerate(tasks):
+                col_task, col_del = st.columns([4, 1])
+                with col_task:
+                    st.write(f"- {task}")
+                with col_del:
+                    if st.button("🗑️ Delete", key=f"del_task_{station}_{i}"):
+                        try:
+                            supabase.table('station_tasks').delete().eq('station', station).eq('task', task).execute()
+                            fetch_station_tasks.clear()
+                            st.success(f"Task '{task}' removed.")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error deleting task: {e}")
+
+            st.markdown("---")
+            st.markdown("**Add New Task**")
+            # Form to add a new task to this station
+            with st.form(key=f"add_task_form_{station}"):
+                new_task_desc = st.text_input("New Task Description", placeholder="e.g., Sanitize countertops")
+                submit_new_task = st.form_submit_button("➕ Add Task")
+
+                if submit_new_task:
+                    if new_task_desc.strip():
+                        try:
+                            supabase.table('station_tasks').insert({
+                                "station": station,
+                                "task": new_task_desc.strip()
+                            }).execute()
+                            fetch_station_tasks.clear()
+                            st.success(f"Task added to {station}!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error adding task: {e}")
+                    else:
+                        st.warning("Task description cannot be empty.")
+
+            st.markdown("---")
+            # Delete Entire Station
+            if st.button("🚨 Delete Entire Station", type="primary", key=f"del_station_{station}"):
+                try:
+                    supabase.table('station_tasks').delete().eq('station', station).execute()
+                    fetch_station_tasks.clear()
+                    st.success(f"Station '{station}' completely removed.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error deleting station: {e}")
+
+    st.markdown("---")
+    st.markdown("### ➕ Create New Station")
+    with st.form(key="create_station_form"):
+        new_station_name = st.text_input("New Station Name", placeholder="e.g., Dining Room")
+        new_station_task = st.text_input("Initial Task", placeholder="e.g., Wipe all tables")
+        submit_new_station = st.form_submit_button("Create Station")
+
+        if submit_new_station:
+            if new_station_name.strip() and new_station_task.strip():
+                try:
+                    supabase.table('station_tasks').insert({
+                        "station": new_station_name.strip(),
+                        "task": new_station_task.strip()
+                    }).execute()
+                    fetch_station_tasks.clear()
+                    st.success(f"New station '{new_station_name.strip()}' created!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error creating station: {e}")
+            else:
+                st.warning("Both Station Name and Initial Task are required to create a new station.")
