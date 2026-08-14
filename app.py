@@ -17,7 +17,18 @@ st.markdown("Live photographic proof & binary station checklist verification.")
 st.markdown("---")
 
 employee_name = st.text_input("Employee Identifier", placeholder="Enter your name")
+
+# If station changes, we want to reset the task photos and active camera
+if 'current_station' not in st.session_state:
+    st.session_state.current_station = list(STATION_TASKS.keys())[0]
+
 station = st.selectbox("Select Station", list(STATION_TASKS.keys()))
+
+if station != st.session_state.current_station:
+    st.session_state.current_station = station
+    st.session_state.task_photos = {}
+    st.session_state.active_camera = None
+    st.rerun()
 
 st.subheader(f"{station} Operational Requirements")
 
@@ -25,54 +36,60 @@ st.subheader(f"{station} Operational Requirements")
 if 'task_photos' not in st.session_state:
     st.session_state.task_photos = {}
 
-st.info("You must capture a live photo for a task before you can check it off.")
+# Track which task's camera is currently open
+if 'active_camera' not in st.session_state:
+    st.session_state.active_camera = None
 
-# Single camera input for all tasks
-photo = st.camera_input("Capture Proof")
-if photo:
-    st.success("Photo captured! You can now use it to verify a task below.")
+st.info("Click '📷 Verify Task' to open the camera and submit photographic proof.")
 
 st.markdown("---")
 st.subheader("Task Verification")
 
 tasks_for_station = STATION_TASKS[station]
-checklist_status = []
 
 for task in tasks_for_station:
     task_key = f"{station}_{task}"
 
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        # Checkbox is disabled until a photo is captured or already saved for this task
-        can_check = photo is not None or task_key in st.session_state.task_photos
-        is_done = st.checkbox(
-            task,
-            key=f"check_{task_key}",
-            disabled=not can_check,
-            help="Take a photo first to enable this checkbox." if not can_check else ""
-        )
-        checklist_status.append(is_done)
+    col_text, col_btn = st.columns([3, 1])
 
-    with col2:
-        if is_done and photo is not None and task_key not in st.session_state.task_photos:
-            # Save the currently captured photo to this task in session state
-            st.session_state.task_photos[task_key] = photo.getvalue()
+    with col_text:
+        st.write(f"**{task}**")
 
-        if task_key in st.session_state.task_photos and is_done:
-            st.success("📸 Verified")
-        elif not is_done and task_key in st.session_state.task_photos:
-            # If user unchecks the box, clear the photo
-            del st.session_state.task_photos[task_key]
+    with col_btn:
+        if task_key in st.session_state.task_photos:
+            st.success("✅ Verified")
+            # Option to retake photo
+            if st.button("Retake", key=f"retake_{task_key}"):
+                del st.session_state.task_photos[task_key]
+                st.session_state.active_camera = task_key
+                st.rerun()
+        else:
+            if st.button("📷 Verify Task", key=f"verify_{task_key}"):
+                st.session_state.active_camera = task_key
+                st.rerun()
 
-st.markdown("---")
+    # If this task is the currently active camera, show the camera input
+    if st.session_state.active_camera == task_key:
+        with st.container():
+            st.markdown(f"**Taking photo for:** {task}")
+            photo = st.camera_input("Capture Proof", key=f"camera_{task_key}")
 
-if st.button("Submit All Verifications", type="primary", use_container_width=True):
+            if photo:
+                st.session_state.task_photos[task_key] = photo.getvalue()
+                st.session_state.active_camera = None
+                st.rerun()
+
+            if st.button("Cancel", key=f"cancel_{task_key}"):
+                st.session_state.active_camera = None
+                st.rerun()
+    st.markdown("---")
+
+# Only allow submission if all tasks have a photo
+all_tasks_verified = len(st.session_state.task_photos) == len(tasks_for_station)
+
+if st.button("Submit All Verifications", type="primary", use_container_width=True, disabled=not all_tasks_verified):
     if not employee_name:
         st.error("Error: Employee Identifier required.")
-    elif not all(checklist_status):
-        st.error("Error: All operational requirements must be verified. No partial completions accepted.")
-    elif len(st.session_state.task_photos) < len(tasks_for_station):
-        st.error("Error: Missing photos for some verified tasks.")
     else:
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         all_success = True
@@ -112,3 +129,5 @@ if st.button("Submit All Verifications", type="primary", use_container_width=Tru
             st.balloons()
             # Clear session state for next user
             st.session_state.task_photos = {}
+            st.session_state.active_camera = None
+            st.session_state.current_station = station
