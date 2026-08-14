@@ -1,0 +1,24 @@
+
+Collecting usage statistics. To deactivate, set browser.gatherUsageStats to False.
+
+
+  You can now view your Streamlit app in your browser.
+
+  Network URL: http://192.168.0.2:8501
+  External URL: http://34.134.215.5:8501
+
+/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/streamlit/util.py:227: RuntimeWarning: coroutine 'expire_cache' was never awaited
+  pass
+RuntimeWarning: Enable tracemalloc to get the object allocation traceback
+/app/ai_validator.py:6: FutureWarning:
+
+All support for the `google.generativeai` package has ended. It will no longer be receiving
+updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+See README for more details:
+
+https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+
+  import google.generativeai as genai
+/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/streamlit/util.py:227: RuntimeWarning: coroutine 'expire_cache' was never awaited
+  pass
+RuntimeWarning: Enable tracemalloc to get the object allocation traceback

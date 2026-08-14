@@ -1,11 +1,22 @@
 import streamlit as st
+st.set_page_config(page_title="Manager Command Center", page_icon="👁️", layout="wide")
+
 import pandas as pd
 import io
 import base64
 from PIL import Image
 from config import supabase, fetch_station_tasks
+from ui_styling import apply_custom_css
 
-st.set_page_config(page_title="Manager Command Center", page_icon="👁️", layout="wide")
+
+apply_custom_css()
+
+try:
+    with open("assets/logo.png", "rb") as f:
+        logo_data = base64.b64encode(f.read()).decode()
+    st.sidebar.markdown(f'<img src="data:image/png;base64,{logo_data}" class="mh-logo">', unsafe_allow_html=True)
+except:
+    pass
 
 def check_password():
     def password_entered():

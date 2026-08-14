@@ -1,14 +1,24 @@
 import streamlit as st
-import base64
-from datetime import datetime
-from config import supabase, fetch_station_tasks
-from ai_validator import validate_photo_with_ai
-
 st.set_page_config(
     page_title="Closing Verification Protocol",
     page_icon="🔒",
     layout="centered"
 )
+
+import base64
+from datetime import datetime
+from config import supabase, fetch_station_tasks
+from ai_validator import validate_photo_with_ai
+from ui_styling import apply_custom_css
+
+apply_custom_css()
+
+try:
+    with open("assets/logo.png", "rb") as f:
+        logo_data = base64.b64encode(f.read()).decode()
+    st.markdown(f'<img src="data:image/png;base64,{logo_data}" class="mh-logo">', unsafe_allow_html=True)
+except:
+    pass
 
 STATION_TASKS = fetch_station_tasks()
 
