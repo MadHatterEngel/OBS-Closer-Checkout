@@ -7,8 +7,22 @@ DATA_DIR = os.path.dirname(os.path.abspath(__file__))
 
 @st.cache_resource
 def init_connection():
-    url = st.secrets["supabase"]["URL"]
-    key = st.secrets["supabase"]["KEY"]
+    # Try multiple ways to retrieve the Supabase secrets
+    url = None
+    key = None
+
+    if "supabase" in st.secrets:
+        url = st.secrets["supabase"].get("URL")
+        key = st.secrets["supabase"].get("KEY")
+
+    if not url:
+        url = st.secrets.get("SUPABASE_URL", os.environ.get("SUPABASE_URL"))
+    if not key:
+        key = st.secrets.get("SUPABASE_KEY", os.environ.get("SUPABASE_KEY"))
+
+    if not url or not key:
+        raise ValueError("Supabase URL or KEY not found in Streamlit secrets or environment variables.")
+
     return create_client(url, key)
 
 # Initialize Supabase client
