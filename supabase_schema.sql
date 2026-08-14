@@ -52,5 +52,28 @@ CREATE TABLE IF NOT EXISTS ai_references (
 );
 
 -- Note: To allow the Streamlit app to read this data, run:
--- ALTER TABLE ai_references ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY "Enable read access for all users" ON ai_references FOR SELECT USING (true);
+-- ==========================================
+-- ROW LEVEL SECURITY (RLS) POLICIES
+-- ==========================================
+-- If you have RLS enabled (which is standard/recommended in Supabase),
+-- you MUST run the following policies to allow the Manager App and Closer App
+-- to read, insert, update, and delete data as intended.
+
+-- 1. Enable RLS on all tables
+ALTER TABLE closing_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE shift_metrics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE station_tasks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ai_references ENABLE ROW LEVEL SECURITY;
+
+-- 2. Closing Logs: Allow inserting (Closer app) and reading/deleting (Manager app)
+CREATE POLICY "Enable all operations for anon users" ON closing_logs FOR ALL USING (true) WITH CHECK (true);
+
+-- 3. Station Tasks: Allow reading (Closer app) and inserting/deleting (Manager app)
+CREATE POLICY "Enable all operations for anon users" ON station_tasks FOR ALL USING (true) WITH CHECK (true);
+
+-- 4. AI References: Allow reading (Closer app) and inserting/updating (Manager app)
+CREATE POLICY "Enable all operations for anon users" ON ai_references FOR ALL USING (true) WITH CHECK (true);
+
+-- Note: The policies above use `FOR ALL USING (true) WITH CHECK (true)`
+-- which grants full public access since authentication is handled
+-- via the Streamlit "manager123" password logic rather than Supabase Auth.
