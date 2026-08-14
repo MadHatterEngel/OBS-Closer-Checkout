@@ -3,3 +3,4 @@ pandas
 Pillow
 plotly
 supabase
+google-generativeai

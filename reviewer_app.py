@@ -3,7 +3,7 @@ import pandas as pd
 import io
 import base64
 from PIL import Image
-from config import supabase
+from config import supabase, fetch_station_tasks
 
 st.set_page_config(page_title="Manager Command Center", page_icon="👁️", layout="wide")
 
@@ -32,146 +32,226 @@ st.title("👁️ Manager Operations Review Dashboard")
 st.markdown("Remote verification portal for live shift closing logs and photographic proof.")
 st.markdown("---")
 
-def fetch_logs():
-    try:
-        # Increased limit so a single multi-task checkout isn't cut off
-        response = supabase.table('closing_logs').select('id, timestamp, employee_name, station, photo_data, status').order('id', desc=True).limit(250).execute()
-        return response.data
-    except Exception as e:
-        st.error(f"Database error: {str(e)}")
-        return []
+tab1, tab2 = st.tabs(["📋 Review Logs", "🤖 AI Verification Setup"])
 
-logs = fetch_logs()
+with tab1:
+    def fetch_logs():
+        try:
+            # Increased limit so a single multi-task checkout isn't cut off
+            response = supabase.table('closing_logs').select('id, timestamp, employee_name, station, photo_data, status').order('id', desc=True).limit(250).execute()
+            return response.data
+        except Exception as e:
+            st.error(f"Database error: {str(e)}")
+            return []
 
-# Group logs by checkout (timestamp, employee, base station)
-checkouts = {}
-for log in logs:
-    # Handle the fact that station strings might look like "Fry Station - Oil filtered"
-    station_str = log['station']
-    if " - " in station_str:
-        base_station, task_name = station_str.split(" - ", 1)
+    logs = fetch_logs()
+
+    # Group logs by checkout (timestamp, employee, base station)
+    checkouts = {}
+    for log in logs:
+        # Handle the fact that station strings might look like "Fry Station - Oil filtered"
+        station_str = log['station']
+        if " - " in station_str:
+            base_station, task_name = station_str.split(" - ", 1)
+        else:
+            base_station, task_name = station_str, "General"
+
+        checkout_key = f"{log['timestamp']}_{log['employee_name']}_{base_station}"
+
+        if checkout_key not in checkouts:
+            checkouts[checkout_key] = {
+                'timestamp': log['timestamp'],
+                'employee': log['employee_name'],
+                'station': base_station,
+                'status': log['status'], # Take the status of the first found log
+                'tasks': []
+            }
+
+        checkouts[checkout_key]['tasks'].append({
+            'id': log['id'],
+            'task_name': task_name,
+            'photo_data': log['photo_data'],
+            'status': log['status']
+        })
+
+    # Allow download and clear even if there are no logs to avoid confusing the user
+    # that the buttons are just gone.
+    if not logs:
+        st.info("No compliance logs detected in the database.")
     else:
-        base_station, task_name = station_str, "General"
+        # Summary Metrics
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Total Checkouts", len(checkouts))
 
-    checkout_key = f"{log['timestamp']}_{log['employee_name']}_{base_station}"
+        # Get the latest submission timestamp
+        latest_time = list(checkouts.values())[0]['timestamp'] if checkouts else "N/A"
+        col2.metric("Latest Submission", latest_time)
 
-    if checkout_key not in checkouts:
-        checkouts[checkout_key] = {
-            'timestamp': log['timestamp'],
-            'employee': log['employee_name'],
-            'station': base_station,
-            'status': log['status'], # Take the status of the first found log
-            'tasks': []
-        }
+        unique_stations = len(set(c['station'] for c in checkouts.values()))
+        col3.metric("Stations Audited", unique_stations)
 
-    checkouts[checkout_key]['tasks'].append({
-        'id': log['id'],
-        'task_name': task_name,
-        'photo_data': log['photo_data'],
-        'status': log['status']
-    })
+        st.markdown("---")
+        st.subheader("📸 Visual Compliance Feed")
+        st.markdown("Click any photo to expand it to full screen.")
 
-# Allow download and clear even if there are no logs to avoid confusing the user
-# that the buttons are just gone.
-if not logs:
-    st.info("No compliance logs detected in the database.")
-else:
-    # Summary Metrics
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Total Checkouts", len(checkouts))
+        for key, checkout in checkouts.items():
+            timestamp = checkout['timestamp']
+            employee = checkout['employee']
+            station = checkout['station']
+            overall_status = checkout['status']
+            tasks = checkout['tasks']
 
-    # Get the latest submission timestamp
-    latest_time = list(checkouts.values())[0]['timestamp'] if checkouts else "N/A"
-    col2.metric("Latest Submission", latest_time)
+            with st.expander(f"{timestamp} | {employee} — {station} ({len(tasks)} tasks verified)"):
 
-    unique_stations = len(set(c['station'] for c in checkouts.values()))
-    col3.metric("Stations Audited", unique_stations)
+                # Create a dynamic 3-column grid
+                cols = st.columns(3)
+
+                for idx, task in enumerate(tasks):
+                    col = cols[idx % 3] # Distribute evenly across the 3 columns
+                    with col:
+                        st.markdown(f"**{task['task_name']}**")
+                        if task['photo_data']:
+                            try:
+                                photo_bytes = base64.b64decode(task['photo_data'])
+                                image = Image.open(io.BytesIO(photo_bytes))
+                                # Streamlit's native st.image has built-in fullscreen viewing
+                                st.image(image, use_container_width=True)
+                            except Exception as e:
+                                st.error(f"Failed to load image data: {str(e)}")
+                        else:
+                            st.warning("No image data found.")
+                        st.markdown("---")
 
     st.markdown("---")
-    st.subheader("📸 Visual Compliance Feed")
-    st.markdown("Click any photo to expand it to full screen.")
+    st.subheader("🛠️ Data Management")
 
-    for key, checkout in checkouts.items():
-        timestamp = checkout['timestamp']
-        employee = checkout['employee']
-        station = checkout['station']
-        overall_status = checkout['status']
-        tasks = checkout['tasks']
+    # Prepare data for download (excluding base64 image data).
+    # We export the raw, flat, highly detailed logs here for the user's records.
+    download_data = []
+    for log in logs:
+        download_data.append({
+            "ID": log["id"],
+            "Timestamp": log["timestamp"],
+            "Employee": log["employee_name"],
+            "Station & Task": log["station"],
+            "Status": log["status"]
+        })
 
-        with st.expander(f"{timestamp} | {employee} — {station} ({len(tasks)} tasks verified)"):
+    if download_data:
+        df = pd.DataFrame(download_data)
+    else:
+        df = pd.DataFrame(columns=["ID", "Timestamp", "Employee", "Station & Task", "Status"])
 
-            # Create a dynamic 3-column grid
-            cols = st.columns(3)
+    csv = df.to_csv(index=False).encode('utf-8')
 
-            for idx, task in enumerate(tasks):
-                col = cols[idx % 3] # Distribute evenly across the 3 columns
-                with col:
-                    st.markdown(f"**{task['task_name']}**")
-                    if task['photo_data']:
-                        try:
-                            photo_bytes = base64.b64decode(task['photo_data'])
-                            image = Image.open(io.BytesIO(photo_bytes))
-                            # Streamlit's native st.image has built-in fullscreen viewing
-                            st.image(image, use_container_width=True)
-                        except Exception as e:
-                            st.error(f"Failed to load image data: {str(e)}")
-                    else:
-                        st.warning("No image data found.")
-                    st.markdown("---")
+    col_dl, col_clear = st.columns(2)
 
-st.markdown("---")
-st.subheader("🛠️ Data Management")
+    with col_dl:
+        st.download_button(
+            label="📥 Download Detailed Logs (CSV)",
+            data=csv,
+            file_name="detailed_closing_logs.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
 
-# Prepare data for download (excluding base64 image data).
-# We export the raw, flat, highly detailed logs here for the user's records.
-download_data = []
-for log in logs:
-    download_data.append({
-        "ID": log["id"],
-        "Timestamp": log["timestamp"],
-        "Employee": log["employee_name"],
-        "Station & Task": log["station"],
-        "Status": log["status"]
-    })
+    with col_clear:
+        if st.button("🗑️ Clear All Logs", type="secondary", use_container_width=True):
+            st.session_state.confirm_clear = True
 
-if download_data:
-    df = pd.DataFrame(download_data)
-else:
-    df = pd.DataFrame(columns=["ID", "Timestamp", "Employee", "Station & Task", "Status"])
+    if st.session_state.get("confirm_clear", False):
+        st.warning("⚠️ **WARNING:** This will permanently delete ALL checkout logs. This action cannot be undone.")
+        col_confirm, col_cancel = st.columns(2)
 
-csv = df.to_csv(index=False).encode('utf-8')
+        with col_confirm:
+            if st.button("🚨 Yes, Delete ALL Logs", type="primary", use_container_width=True):
+                try:
+                    # Delete all rows where id is not 0 (which is always true)
+                    response = supabase.table('closing_logs').delete().neq('id', 0).execute()
+                    st.success("All logs successfully deleted.")
+                    st.session_state.confirm_clear = False
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Failed to delete logs: {str(e)}")
 
-col_dl, col_clear = st.columns(2)
-
-with col_dl:
-    st.download_button(
-        label="📥 Download Detailed Logs (CSV)",
-        data=csv,
-        file_name="detailed_closing_logs.csv",
-        mime="text/csv",
-        use_container_width=True
-    )
-
-with col_clear:
-    if st.button("🗑️ Clear All Logs", type="secondary", use_container_width=True):
-        st.session_state.confirm_clear = True
-
-if st.session_state.get("confirm_clear", False):
-    st.warning("⚠️ **WARNING:** This will permanently delete ALL checkout logs. This action cannot be undone.")
-    col_confirm, col_cancel = st.columns(2)
-
-    with col_confirm:
-        if st.button("🚨 Yes, Delete ALL Logs", type="primary", use_container_width=True):
-            try:
-                # Delete all rows where id is not 0 (which is always true)
-                response = supabase.table('closing_logs').delete().neq('id', 0).execute()
-                st.success("All logs successfully deleted.")
+        with col_cancel:
+            if st.button("Cancel", use_container_width=True):
                 st.session_state.confirm_clear = False
                 st.rerun()
-            except Exception as e:
-                st.error(f"Failed to delete logs: {str(e)}")
 
-    with col_cancel:
-        if st.button("Cancel", use_container_width=True):
-            st.session_state.confirm_clear = False
-            st.rerun()
+with tab2:
+    st.subheader("🤖 AI Reference Standards")
+    st.markdown("Upload clean reference photos and set AI strictness levels. If a task has no reference photo, it will automatically pass verification.")
+
+    # Fetch existing AI references
+    try:
+        ref_response = supabase.table('ai_references').select('*').execute()
+        existing_refs = {row['task_key']: row for row in ref_response.data}
+    except Exception as e:
+        st.error(f"Failed to load AI references: {e}")
+        existing_refs = {}
+
+    station_tasks = fetch_station_tasks()
+
+    # Select a station to configure
+    selected_station = st.selectbox("Select Station to Configure", list(station_tasks.keys()))
+
+    st.markdown(f"### {selected_station} Tasks")
+
+    for task in station_tasks[selected_station]:
+        task_key = f"{selected_station}_{task}"
+
+        with st.expander(f"Task: {task}"):
+            col_img, col_settings = st.columns(2)
+
+            ref_data = existing_refs.get(task_key)
+            current_strictness = ref_data['strictness'] if ref_data else 5
+
+            with col_img:
+                st.markdown("**Current Reference Image**")
+                if ref_data and ref_data['photo_data']:
+                    try:
+                        photo_bytes = base64.b64decode(ref_data['photo_data'])
+                        image = Image.open(io.BytesIO(photo_bytes))
+                        st.image(image, use_container_width=True)
+                    except Exception:
+                        st.error("Failed to render existing image.")
+                else:
+                    st.info("No reference image uploaded.")
+
+            with col_settings:
+                # Uploader for new reference
+                new_image = st.file_uploader(f"Upload New Reference", type=["jpg", "jpeg", "png"], key=f"up_{task_key}")
+
+                # Strictness slider
+                new_strictness = st.slider(
+                    "AI Strictness Level",
+                    min_value=1, max_value=10, value=current_strictness,
+                    help="1 = Very loose (passes almost anything), 10 = Very strict (must look exactly like reference)",
+                    key=f"slider_{task_key}"
+                )
+
+                if st.button("Save AI Settings", type="primary", key=f"save_{task_key}"):
+                    update_data = {"strictness": new_strictness}
+
+                    if new_image is not None:
+                        # Process uploaded image
+                        img_bytes = new_image.getvalue()
+                        update_data["photo_data"] = base64.b64encode(img_bytes).decode('utf-8')
+
+                    try:
+                        if ref_data:
+                            # Update existing
+                            supabase.table('ai_references').update(update_data).eq('task_key', task_key).execute()
+                        else:
+                            # Insert new
+                            if "photo_data" not in update_data:
+                                st.error("You must upload an image to create a new reference.")
+                                st.stop()
+                            update_data["task_key"] = task_key
+                            supabase.table('ai_references').insert(update_data).execute()
+
+                        st.success("Settings saved successfully!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Failed to save settings: {e}")

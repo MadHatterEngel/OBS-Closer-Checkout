@@ -75,9 +75,35 @@ for task in tasks_for_station:
             photo = st.camera_input("Capture Proof", key=f"camera_{task_key}")
 
             if photo:
-                st.session_state.task_photos[task_key] = photo.getvalue()
-                st.session_state.active_camera = None
-                st.rerun()
+                photo_bytes = photo.getvalue()
+
+                # Retrieve AI Reference from Supabase
+                baseline_bytes = None
+                strictness = 5
+                try:
+                    ref_response = supabase.table('ai_references').select('photo_data, strictness').eq('task_key', task_key).execute()
+                    if ref_response.data and len(ref_response.data) > 0:
+                        ref_record = ref_response.data[0]
+                        baseline_bytes = base64.b64decode(ref_record['photo_data'])
+                        strictness = ref_record['strictness']
+                except Exception as e:
+                    st.warning(f"Failed to check reference image: {e}")
+
+                with st.spinner("🤖 AI Auditing Photo..."):
+                    ai_res = validate_photo_with_ai(baseline_bytes, photo_bytes, strictness)
+
+                if ai_res["status"] == "FAIL":
+                    st.error(f"❌ AI Verification Failed: {ai_res['reason']} Please try again.")
+                    # We do not save it, forcing them to retake
+                else:
+                    if baseline_bytes:
+                        st.success(f"✅ AI Approved! ({ai_res['reason']})")
+                    else:
+                        st.success("✅ Saved! (No AI reference found for this task, auto-passed).")
+
+                    st.session_state.task_photos[task_key] = photo_bytes
+                    st.session_state.active_camera = None
+                    st.rerun()
 
             if st.button("Cancel", key=f"cancel_{task_key}"):
                 st.session_state.active_camera = None
@@ -99,15 +125,6 @@ if st.button("Submit All Verifications", type="primary", use_container_width=Tru
                 task_key = f"{station}_{task}"
                 photo_bytes = st.session_state.task_photos[task_key]
 
-                # Optional AI Validation check
-                ai_res = validate_photo_with_ai(None, photo_bytes)
-                status = ai_res["status"]
-
-                if status == "FAIL":
-                    st.error(f"AI Verification Failed for '{task}': {ai_res['reason']}")
-                    all_success = False
-                    break
-
                 photo_base64 = base64.b64encode(photo_bytes).decode('utf-8')
 
                 # Insert individual log for this task
@@ -117,7 +134,7 @@ if st.button("Submit All Verifications", type="primary", use_container_width=Tru
                         'employee_name': employee_name,
                         'station': f"{station} - {task}",
                         'photo_data': photo_base64,
-                        'status': status
+                        'status': "APPROVED" # Since it passed AI at the camera stage
                     }).execute()
                 except Exception as e:
                     st.error(f"Database error on task '{task}': {str(e)}")
