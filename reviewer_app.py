@@ -34,13 +34,42 @@ st.markdown("---")
 
 def fetch_logs():
     try:
-        response = supabase.table('closing_logs').select('id, timestamp, employee_name, station, photo_data, status').order('id', desc=True).limit(50).execute()
+        # Increased limit so a single multi-task checkout isn't cut off
+        response = supabase.table('closing_logs').select('id, timestamp, employee_name, station, photo_data, status').order('id', desc=True).limit(250).execute()
         return response.data
     except Exception as e:
         st.error(f"Database error: {str(e)}")
         return []
 
 logs = fetch_logs()
+
+# Group logs by checkout (timestamp, employee, base station)
+checkouts = {}
+for log in logs:
+    # Handle the fact that station strings might look like "Fry Station - Oil filtered"
+    station_str = log['station']
+    if " - " in station_str:
+        base_station, task_name = station_str.split(" - ", 1)
+    else:
+        base_station, task_name = station_str, "General"
+
+    checkout_key = f"{log['timestamp']}_{log['employee_name']}_{base_station}"
+
+    if checkout_key not in checkouts:
+        checkouts[checkout_key] = {
+            'timestamp': log['timestamp'],
+            'employee': log['employee_name'],
+            'station': base_station,
+            'status': log['status'], # Take the status of the first found log
+            'tasks': []
+        }
+
+    checkouts[checkout_key]['tasks'].append({
+        'id': log['id'],
+        'task_name': task_name,
+        'photo_data': log['photo_data'],
+        'status': log['status']
+    })
 
 # Allow download and clear even if there are no logs to avoid confusing the user
 # that the buttons are just gone.
@@ -49,60 +78,66 @@ if not logs:
 else:
     # Summary Metrics
     col1, col2, col3 = st.columns(3)
-    col1.metric("Total Closing Logs", len(logs))
-    col2.metric("Latest Submission", logs[0]['timestamp'] if logs else "N/A")
-    unique_stations = len(set(log['station'] for log in logs))
+    col1.metric("Total Checkouts", len(checkouts))
+
+    # Get the latest submission timestamp
+    latest_time = list(checkouts.values())[0]['timestamp'] if checkouts else "N/A"
+    col2.metric("Latest Submission", latest_time)
+
+    unique_stations = len(set(c['station'] for c in checkouts.values()))
     col3.metric("Stations Audited", unique_stations)
 
     st.markdown("---")
     st.subheader("📸 Visual Compliance Feed")
+    st.markdown("Click any photo to expand it to full screen.")
 
-    for log in logs:
-        log_id = log['id']
-        timestamp = log['timestamp']
-        employee = log['employee_name']
-        station = log['station']
-        photo_data_b64 = log['photo_data']
-        status = log['status']
+    for key, checkout in checkouts.items():
+        timestamp = checkout['timestamp']
+        employee = checkout['employee']
+        station = checkout['station']
+        overall_status = checkout['status']
+        tasks = checkout['tasks']
 
-        with st.expander(f"Log #{log_id}: {timestamp} | {employee} — {station}"):
-            data_col, photo_col = st.columns([1, 2])
+        with st.expander(f"{timestamp} | {employee} — {station} ({len(tasks)} tasks verified)"):
 
-            with data_col:
-                st.write(f"**Timestamp:** {timestamp}")
-                st.write(f"**Employee:** {employee}")
-                st.write(f"**Station:** {station}")
-                st.write(f"**Compliance Status:** ✅ {status}")
+            # Create a dynamic 3-column grid
+            cols = st.columns(3)
 
-            with photo_col:
-                if photo_data_b64:
-                    try:
-                        photo_bytes = base64.b64decode(photo_data_b64)
-                        image = Image.open(io.BytesIO(photo_bytes))
-                        st.image(image, caption=f"Captured live at {timestamp}", use_container_width=True)
-                    except Exception as e:
-                        st.error(f"Failed to load image data: {str(e)}")
-                else:
-                    st.warning("No image data found for this entry.")
+            for idx, task in enumerate(tasks):
+                col = cols[idx % 3] # Distribute evenly across the 3 columns
+                with col:
+                    st.markdown(f"**{task['task_name']}**")
+                    if task['photo_data']:
+                        try:
+                            photo_bytes = base64.b64decode(task['photo_data'])
+                            image = Image.open(io.BytesIO(photo_bytes))
+                            # Streamlit's native st.image has built-in fullscreen viewing
+                            st.image(image, use_container_width=True)
+                        except Exception as e:
+                            st.error(f"Failed to load image data: {str(e)}")
+                    else:
+                        st.warning("No image data found.")
+                    st.markdown("---")
 
 st.markdown("---")
 st.subheader("🛠️ Data Management")
 
-# Prepare data for download (excluding base64 image data)
+# Prepare data for download (excluding base64 image data).
+# We export the raw, flat, highly detailed logs here for the user's records.
 download_data = []
 for log in logs:
     download_data.append({
         "ID": log["id"],
         "Timestamp": log["timestamp"],
         "Employee": log["employee_name"],
-        "Station": log["station"],
+        "Station & Task": log["station"],
         "Status": log["status"]
     })
 
 if download_data:
     df = pd.DataFrame(download_data)
 else:
-    df = pd.DataFrame(columns=["ID", "Timestamp", "Employee", "Station", "Status"])
+    df = pd.DataFrame(columns=["ID", "Timestamp", "Employee", "Station & Task", "Status"])
 
 csv = df.to_csv(index=False).encode('utf-8')
 
@@ -110,9 +145,9 @@ col_dl, col_clear = st.columns(2)
 
 with col_dl:
     st.download_button(
-        label="📥 Download Logs (CSV)",
+        label="📥 Download Detailed Logs (CSV)",
         data=csv,
-        file_name="closing_logs.csv",
+        file_name="detailed_closing_logs.csv",
         mime="text/csv",
         use_container_width=True
     )
