@@ -3,7 +3,7 @@ AI Photo Standard Auditor Module
 Evaluates submission photos against clean baseline standards using Google Gemini.
 """
 import streamlit as st
-import google.generativeai as genai
+from google import genai
 import io
 from PIL import Image
 
@@ -29,10 +29,7 @@ def validate_photo_with_ai(baseline_image_bytes, submission_photo_bytes, strictn
                 "reason": "AI Verification skipped (No API key found)."
             }
 
-        genai.configure(api_key=api_key)
-
-        # Use gemini-1.5-flash as it is fast and supports multimodal inputs
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        client = genai.Client(api_key=api_key)
 
         # Prepare images for Gemini
         img_baseline = Image.open(io.BytesIO(baseline_image_bytes))
@@ -61,7 +58,11 @@ def validate_photo_with_ai(baseline_image_bytes, submission_photo_bytes, strictn
         REASON: A one-sentence explanation of why it passed or failed.
         """
 
-        response = model.generate_content([prompt, img_baseline, img_submission])
+        # Use gemini-1.5-flash as it is fast and supports multimodal inputs
+        response = client.models.generate_content(
+            model='gemini-1.5-flash',
+            contents=[prompt, img_baseline, img_submission]
+        )
         response_text = response.text.strip()
 
         # Parse response
