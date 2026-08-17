@@ -56,6 +56,7 @@ def validate_photo_with_ai(baseline_image_bytes, submission_photo_bytes, strictn
         You must return your response in EXACTLY this format, with no markdown formatting or other words:
         RESULT: PASS or FAIL
         REASON: A one-sentence explanation of why it passed or failed.
+        FEEDBACK: If the result is FAIL, provide a highly specific, granular observation of exactly what is dirty or out of place (e.g., "There is a crumb on the left side of the cutting board"). If PASS, say "None".
         """
 
         # Use gemini-1.5-flash as it is fast and supports multimodal inputs
@@ -68,6 +69,7 @@ def validate_photo_with_ai(baseline_image_bytes, submission_photo_bytes, strictn
         # Parse response
         status = "FAIL"
         reason = "AI failed to provide a reason."
+        feedback = ""
 
         for line in response_text.split('\n'):
             line = line.strip()
@@ -77,11 +79,16 @@ def validate_photo_with_ai(baseline_image_bytes, submission_photo_bytes, strictn
                     status = "PASS"
             elif line.startswith("REASON:"):
                 reason = line.replace("REASON:", "").strip()
+            elif line.startswith("FEEDBACK:"):
+                feedback_str = line.replace("FEEDBACK:", "").strip()
+                if feedback_str.lower() != "none":
+                    feedback = feedback_str
 
         return {
             "status": status,
             "confidence": 0.95,
-            "reason": reason
+            "reason": reason,
+            "feedback": feedback
         }
 
     except Exception as e:

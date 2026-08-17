@@ -1,0 +1,15 @@
+
+Collecting usage statistics. To deactivate, set browser.gatherUsageStats to False.
+
+
+  You can now view your Streamlit app in your browser.
+
+  Network URL: http://192.168.0.2:8502
+  External URL: http://34.72.116.213:8502
+
+/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/streamlit/util.py:227: RuntimeWarning: coroutine 'expire_cache' was never awaited
+  pass
+RuntimeWarning: Enable tracemalloc to get the object allocation traceback
+/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/streamlit/util.py:227: RuntimeWarning: coroutine 'expire_cache' was never awaited
+  pass
+RuntimeWarning: Enable tracemalloc to get the object allocation traceback

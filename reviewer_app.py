@@ -7,6 +7,7 @@ import base64
 from PIL import Image
 from config import supabase, fetch_station_tasks
 from ui_styling import apply_custom_css
+from ai_validator import validate_photo_with_ai
 
 
 apply_custom_css()
@@ -122,13 +123,25 @@ with tab1:
                     with col:
                         st.markdown(f"**{task['task_name']}**")
                         if task['photo_data']:
-                            try:
-                                photo_bytes = base64.b64decode(task['photo_data'])
-                                image = Image.open(io.BytesIO(photo_bytes))
-                                # Streamlit's native st.image has built-in fullscreen viewing
-                                st.image(image, use_container_width=True)
-                            except Exception as e:
-                                st.error(f"Failed to load image data: {str(e)}")
+                            # Implement lazy loading to prevent massive DOM slow-downs
+                            # Store a unique key for this image in session state
+                            view_key = f"view_img_{task['id']}"
+
+                            if st.session_state.get(view_key, False):
+                                try:
+                                    photo_bytes = base64.b64decode(task['photo_data'])
+                                    image = Image.open(io.BytesIO(photo_bytes))
+                                    st.image(image, use_container_width=True)
+
+                                    if st.button("Hide Image", key=f"hide_btn_{task['id']}"):
+                                        st.session_state[view_key] = False
+                                        st.rerun()
+                                except Exception as e:
+                                    st.error(f"Failed to load image data: {str(e)}")
+                            else:
+                                if st.button("🖼️ View Photo", key=f"show_btn_{task['id']}"):
+                                    st.session_state[view_key] = True
+                                    st.rerun()
                         else:
                             st.warning("No image data found.")
                         st.markdown("---")
@@ -242,6 +255,31 @@ with tab2:
                     key=f"slider_{task_key}"
                 )
 
+                test_image = st.file_uploader(f"Upload Test Image (Evaluates current slider value without saving)", type=["jpg", "jpeg", "png"], key=f"test_{task_key}")
+                if st.button("🔬 Test AI Strictness", key=f"test_btn_{task_key}"):
+                    if test_image is not None:
+                        # Determine which baseline to use (the newly uploaded one, or the existing one)
+                        baseline_bytes = None
+                        if new_image is not None:
+                            baseline_bytes = new_image.getvalue()
+                        elif ref_data and ref_data['photo_data']:
+                            baseline_bytes = base64.b64decode(ref_data['photo_data'])
+
+                        if not baseline_bytes:
+                            st.warning("You must upload a Reference image first before testing.")
+                        else:
+                            with st.spinner("Testing current strictness..."):
+                                ai_res = validate_photo_with_ai(baseline_bytes, test_image.getvalue(), new_strictness)
+                            if ai_res['status'] == 'PASS':
+                                st.success(f"✅ PASSED at strictness {new_strictness} ({ai_res['reason']})")
+                            else:
+                                st.error(f"❌ FAILED at strictness {new_strictness} ({ai_res['reason']})")
+                                if ai_res.get('feedback'):
+                                    st.warning(f"🔍 AI Feedback: {ai_res['feedback']}")
+                    else:
+                        st.warning("Upload a test image first.")
+
+                st.markdown("---")
                 if st.button("Save AI Settings", type="primary", key=f"save_{task_key}"):
                     update_data = {"strictness": new_strictness}
 

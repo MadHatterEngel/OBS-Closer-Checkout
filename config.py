@@ -28,7 +28,7 @@ def init_connection():
 # Initialize Supabase client
 supabase: Client = init_connection()
 
-@st.cache_data(ttl=600)
+@st.cache_data
 def fetch_station_tasks():
     """
     Fetches station tasks dynamically from the Supabase station_tasks table.

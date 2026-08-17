@@ -82,6 +82,27 @@ for task in tasks_for_station:
     if st.session_state.active_camera == task_key:
         with st.container():
             st.markdown(f"**Taking photo for:** {task}")
+
+            # Streamlit does not officially support facing_mode="environment" via python kwargs in this version
+            # But we can inject some JS to forcefully flip the camera stream to the environment camera
+            st.markdown(
+                """
+                <script>
+                // Attempt to modify the media constraints of the Streamlit camera component
+                const constraints = { video: { facingMode: { exact: "environment" } } };
+                navigator.mediaDevices.getUserMedia = (function(orig) {
+                    return function() {
+                        if (arguments[0] && arguments[0].video) {
+                            arguments[0].video.facingMode = { ideal: "environment" };
+                        }
+                        return orig.apply(navigator.mediaDevices, arguments);
+                    };
+                })(navigator.mediaDevices.getUserMedia);
+                </script>
+                """,
+                unsafe_allow_html=True
+            )
+
             photo = st.camera_input("Capture Proof", key=f"camera_{task_key}")
 
             if photo:
@@ -103,7 +124,10 @@ for task in tasks_for_station:
                     ai_res = validate_photo_with_ai(baseline_bytes, photo_bytes, strictness)
 
                 if ai_res["status"] == "FAIL":
-                    st.error(f"❌ AI Verification Failed: {ai_res['reason']} Please try again.")
+                    st.error(f"❌ AI Verification Failed: {ai_res['reason']}")
+                    if ai_res.get('feedback'):
+                        st.warning(f"🔍 AI Observation: {ai_res['feedback']}")
+                    st.info("Please fix the issue and try again.")
                     # We do not save it, forcing them to retake
                 else:
                     if baseline_bytes:
