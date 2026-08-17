@@ -9,7 +9,7 @@ from PIL import Image
 
 def validate_photo_with_ai(baseline_image_bytes, submission_photo_bytes, strictness_level):
     """
-    Compares a submission photo against a baseline using Gemini 3.6.
+    Compares a submission photo against a baseline using Gemini 2.0.
     Returns status ('PASS'/'FAIL') and reasoning.
     """
     # If no baseline is provided, default to PASS per user request
@@ -59,9 +59,9 @@ def validate_photo_with_ai(baseline_image_bytes, submission_photo_bytes, strictn
         FEEDBACK: If the result is FAIL, provide a highly specific, granular observation of exactly what is dirty or out of place (e.g., "There is a crumb on the left side of the cutting board"). If PASS, say "None".
         """
 
-        # Use gemini-3.6-flash as it is fast and supports multimodal inputs
+        # Use gemini-2.0-flash as it is fast and supports multimodal inputs
         response = client.models.generate_content(
-            model='gemini-3.6-flash',
+            model='gemini-2.0-flash',
             contents=[prompt, img_baseline, img_submission]
         )
         response_text = response.text.strip()

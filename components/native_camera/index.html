@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+      body {
+        font-family: 'Roboto', sans-serif;
+        background-color: transparent;
+        color: #F4E8D1;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+      .camera-button {
+        background-color: #8B4513;
+        color: #F4E8D1;
+        border: 2px solid #5C2E16;
+        padding: 12px 24px;
+        text-transform: uppercase;
+        font-family: 'Rye', cursive;
+        font-size: 1.1rem;
+        border-radius: 4px;
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+      .camera-button:active {
+        background-color: #C0392B;
+        border-color: #8B0000;
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.8);
+      }
+      #file-input {
+        display: none;
+      }
+      #preview {
+        max-width: 100%;
+        max-height: 300px;
+        border: 2px solid #8B4513;
+        border-radius: 4px;
+        display: none;
+        margin-bottom: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <label for="file-input" class="camera-button">
+      📸 Open Camera
+    </label>
+    <!-- 'capture="environment"' hints to mobile browsers to open the rear camera natively -->
+    <input type="file" id="file-input" accept="image/*" capture="environment" />
+    <img id="preview" />
+
+    <script>
+      function sendMessageToStreamlit(data) {
+        window.parent.postMessage({
+          isStreamlitMessage: true,
+          type: "streamlit:setComponentValue",
+          value: data
+        }, "*");
+      }
+
+      const fileInput = document.getElementById('file-input');
+      const preview = document.getElementById('preview');
+
+      fileInput.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            // Show preview
+            preview.src = e.target.result;
+            preview.style.display = 'block';
+
+            // Send Base64 data back to Python
+            sendMessageToStreamlit(e.target.result);
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+
+      // Streamlit component lifecycle
+      window.addEventListener("message", function(event) {
+        if (event.data.type === "streamlit:render") {
+          // Send frame height to adjust iframe dynamically
+          window.parent.postMessage({
+            isStreamlitMessage: true,
+            type: "streamlit:setFrameHeight",
+            height: document.body.scrollHeight
+          }, "*");
+        }
+      });
+    </script>
+  </body>
+</html>

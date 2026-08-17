@@ -1,7 +1,7 @@
 import streamlit as st
 st.set_page_config(
-    page_title="Closing Verification Protocol",
-    page_icon="🔒",
+    page_title="Outback Station Validator",
+    page_icon="🥩",
     layout="centered"
 )
 
@@ -10,25 +10,25 @@ from datetime import datetime
 from config import supabase, fetch_station_tasks
 from ai_validator import validate_photo_with_ai
 from ui_styling import apply_custom_css
+from components import native_camera
 
 apply_custom_css()
 
 try:
-    with open("assets/logo.png", "rb") as f:
+    with open("assets/logo.svg", "rb") as f:
         logo_data = base64.b64encode(f.read()).decode()
-    st.markdown(f'<img src="data:image/png;base64,{logo_data}" class="mh-logo">', unsafe_allow_html=True)
+    st.markdown(f'<img src="data:image/svg+xml;base64,{logo_data}" class="mh-logo">', unsafe_allow_html=True)
 except:
     pass
 
 STATION_TASKS = fetch_station_tasks()
 
-st.title("🔒 Shift Verification Protocol")
-st.markdown("Live photographic proof & binary station checklist verification.")
+st.title("🥩 Outback Closing Protocol")
+st.markdown("Batch photo capture and AI verification system.")
 st.markdown("---")
 
 employee_name = st.text_input("Employee Identifier", placeholder="Enter your name")
 
-# If station changes, we want to reset the task photos and active camera
 if 'current_station' not in st.session_state:
     st.session_state.current_station = list(STATION_TASKS.keys())[0]
 
@@ -37,148 +37,182 @@ station = st.selectbox("Select Station", list(STATION_TASKS.keys()))
 if station != st.session_state.current_station:
     st.session_state.current_station = station
     st.session_state.task_photos = {}
-    st.session_state.active_camera = None
+    st.session_state.verification_results = None
     st.rerun()
 
-st.subheader(f"{station} Operational Requirements")
+st.subheader(f"{station} Duties")
 
-# Initialize session state for task photos
+# Track staged photos BEFORE verification
 if 'task_photos' not in st.session_state:
     st.session_state.task_photos = {}
 
-# Track which task's camera is currently open
-if 'active_camera' not in st.session_state:
-    st.session_state.active_camera = None
+# Track batch verification results
+if 'verification_results' not in st.session_state:
+    st.session_state.verification_results = None
 
-st.info("Click '📷 Verify Task' to open the camera and submit photographic proof.")
-
-st.markdown("---")
-st.subheader("Task Verification")
+st.info("Capture a photo for each duty. Once all photos are staged, click 'Verify & Submit All'.")
 
 tasks_for_station = STATION_TASKS[station]
+all_photos_captured = True
 
-for task in tasks_for_station:
-    task_key = f"{station}_{task}"
+# Mode 1: Photo Collection
+if st.session_state.verification_results is None:
+    for task in tasks_for_station:
+        task_key = f"{station}_{task}"
 
-    col_text, col_btn = st.columns([3, 1])
-
-    with col_text:
-        st.write(f"**{task}**")
-
-    with col_btn:
-        if task_key in st.session_state.task_photos:
-            st.success("✅ Verified")
-            # Option to retake photo
-            if st.button("Retake", key=f"retake_{task_key}"):
-                del st.session_state.task_photos[task_key]
-                st.session_state.active_camera = task_key
-                st.rerun()
-        else:
-            if st.button("📷 Verify Task", key=f"verify_{task_key}"):
-                st.session_state.active_camera = task_key
-                st.rerun()
-
-    # If this task is the currently active camera, show the camera input
-    if st.session_state.active_camera == task_key:
         with st.container():
-            st.markdown(f"**Taking photo for:** {task}")
+            st.markdown(f"**{task}**")
 
-            # Streamlit does not officially support facing_mode="environment" via python kwargs in this version
-            # But we can inject some JS to forcefully flip the camera stream to the environment camera
-            st.markdown(
-                """
-                <script>
-                // Attempt to modify the media constraints of the Streamlit camera component
-                const constraints = { video: { facingMode: { exact: "environment" } } };
-                navigator.mediaDevices.getUserMedia = (function(orig) {
-                    return function() {
-                        if (arguments[0] && arguments[0].video) {
-                            arguments[0].video.facingMode = { ideal: "environment" };
-                        }
-                        return orig.apply(navigator.mediaDevices, arguments);
-                    };
-                })(navigator.mediaDevices.getUserMedia);
-                </script>
-                """,
-                unsafe_allow_html=True
-            )
+            if task_key in st.session_state.task_photos:
+                st.success("📸 Photo Staged")
+                # Show small preview
+                st.image(st.session_state.task_photos[task_key], width=150)
+                if st.button("Retake Photo", key=f"retake_{task_key}"):
+                    del st.session_state.task_photos[task_key]
+                    st.rerun()
+            else:
+                all_photos_captured = False
+                st.write("Native Camera / Upload:")
+                # Use our custom native component
+                img_data = native_camera(key=f"cam_{task_key}")
 
-            photo = st.camera_input("Capture Proof", key=f"camera_{task_key}")
-
-            if photo:
-                photo_bytes = photo.getvalue()
-
-                # Retrieve AI Reference from Supabase
-                baseline_bytes = None
-                strictness = 5
-                try:
-                    ref_response = supabase.table('ai_references').select('photo_data, strictness').eq('task_key', task_key).execute()
-                    if ref_response.data and len(ref_response.data) > 0:
-                        ref_record = ref_response.data[0]
-                        baseline_bytes = base64.b64decode(ref_record['photo_data'])
-                        strictness = ref_record['strictness']
-                except Exception as e:
-                    st.warning(f"Failed to check reference image: {e}")
-
-                with st.spinner("🤖 AI Auditing Photo..."):
-                    ai_res = validate_photo_with_ai(baseline_bytes, photo_bytes, strictness)
-
-                if ai_res["status"] == "FAIL":
-                    st.error(f"❌ AI Verification Failed: {ai_res['reason']}")
-                    if ai_res.get('feedback'):
-                        st.warning(f"🔍 AI Observation: {ai_res['feedback']}")
-                    st.info("Please fix the issue and try again.")
-                    # We do not save it, forcing them to retake
-                else:
-                    if baseline_bytes:
-                        st.success(f"✅ AI Approved! ({ai_res['reason']})")
-                    else:
-                        st.success("✅ Saved! (No AI reference found for this task, auto-passed).")
-
+                # Custom component returns base64 string: "data:image/jpeg;base64,..."
+                if img_data:
+                    # Strip the metadata header
+                    base64_str = img_data.split(',')[1]
+                    photo_bytes = base64.b64decode(base64_str)
                     st.session_state.task_photos[task_key] = photo_bytes
-                    st.session_state.active_camera = None
                     st.rerun()
 
-            if st.button("Cancel", key=f"cancel_{task_key}"):
-                st.session_state.active_camera = None
+        st.markdown("---")
+
+    if st.button("Verify & Submit All", type="primary", use_container_width=True, disabled=not all_photos_captured):
+        if not employee_name:
+            st.error("Employee Identifier is required.")
+        else:
+            with st.spinner("🤖 AI Auditing all photos... this may take a moment."):
+                results = {}
+                for task in tasks_for_station:
+                    task_key = f"{station}_{task}"
+                    photo_bytes = st.session_state.task_photos[task_key]
+
+                    baseline_bytes = None
+                    strictness = 5
+                    try:
+                        ref_response = supabase.table('ai_references').select('photo_data, strictness').eq('task_key', task_key).execute()
+                        if ref_response.data and len(ref_response.data) > 0:
+                            ref_record = ref_response.data[0]
+                            baseline_bytes = base64.b64decode(ref_record['photo_data'])
+                            strictness = ref_record['strictness']
+                    except Exception as e:
+                        print(f"Failed to check reference: {e}")
+
+                    ai_res = validate_photo_with_ai(baseline_bytes, photo_bytes, strictness)
+                    results[task_key] = ai_res
+
+                st.session_state.verification_results = results
                 st.rerun()
-    st.markdown("---")
 
-# Only allow submission if all tasks have a photo
-all_tasks_verified = len(st.session_state.task_photos) == len(tasks_for_station)
+# Mode 2: Verification Results & Retake
+else:
+    st.header("📋 Verification Results")
+    results = st.session_state.verification_results
 
-if st.button("Submit All Verifications", type="primary", use_container_width=True, disabled=not all_tasks_verified):
-    if not employee_name:
-        st.error("Error: Employee Identifier required.")
-    else:
+    all_passed = True
+
+    for task in tasks_for_station:
+        task_key = f"{station}_{task}"
+        res = results[task_key]
+
+        with st.container():
+            st.markdown(f"**{task}**")
+            st.image(st.session_state.task_photos[task_key], width=200)
+
+            if res["status"] == "FAIL":
+                all_passed = False
+                st.error(f"❌ FAILED: {res['reason']}")
+                if res.get('feedback'):
+                    st.warning(f"🔍 AI Feedback: {res['feedback']}")
+
+                st.write("Please fix the issue and upload a new photo:")
+
+                # Custom Native Component for retake
+                img_data = native_camera(key=f"retake_cam_{task_key}")
+                if img_data:
+                    base64_str = img_data.split(',')[1]
+                    photo_bytes = base64.b64decode(base64_str)
+                    if photo_bytes != st.session_state.task_photos.get(task_key):
+                        st.session_state.task_photos[task_key] = photo_bytes
+                        # Update the results status to 'RETAKEN' so they know it needs to be verified again
+                        st.session_state.verification_results[task_key] = {"status": "RETAKEN", "reason": "Photo updated. Waiting for re-verification."}
+                        st.rerun()
+            elif res["status"] == "RETAKEN":
+                all_passed = False
+                st.info("🔄 Photo updated. Ready for re-verification.")
+                st.write("Native Camera / Upload:")
+                img_data = native_camera(key=f"retake_cam2_{task_key}")
+                if img_data:
+                    base64_str = img_data.split(',')[1]
+                    photo_bytes = base64.b64decode(base64_str)
+                    if photo_bytes != st.session_state.task_photos.get(task_key):
+                        st.session_state.task_photos[task_key] = photo_bytes
+                        st.session_state.verification_results[task_key] = {"status": "RETAKEN", "reason": "Photo updated. Waiting for re-verification."}
+                        st.rerun()
+            else:
+                st.success(f"✅ PASSED: {res['reason']}")
+
+        st.markdown("---")
+
+    if not all_passed:
+        if st.button("Re-Verify Pending Duties", type="primary", use_container_width=True):
+            with st.spinner("🤖 Re-evaluating updated photos..."):
+                for task in tasks_for_station:
+                    task_key = f"{station}_{task}"
+                    # Only re-verify those that failed or were retaken
+                    if st.session_state.verification_results[task_key]["status"] != "PASS":
+                        photo_bytes = st.session_state.task_photos[task_key]
+                        baseline_bytes = None
+                        strictness = 5
+                        try:
+                            ref_response = supabase.table('ai_references').select('photo_data, strictness').eq('task_key', task_key).execute()
+                            if ref_response.data and len(ref_response.data) > 0:
+                                ref_record = ref_response.data[0]
+                                baseline_bytes = base64.b64decode(ref_record['photo_data'])
+                                strictness = ref_record['strictness']
+                        except Exception as e:
+                            print(f"Failed to check reference: {e}")
+
+                        ai_res = validate_photo_with_ai(baseline_bytes, photo_bytes, strictness)
+                        st.session_state.verification_results[task_key] = ai_res
+                st.rerun()
+
+    if all_passed:
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        all_success = True
-
-        with st.spinner("Uploading verification logs..."):
+        with st.spinner("Submitting final logs..."):
+            all_success = True
             for task in tasks_for_station:
                 task_key = f"{station}_{task}"
-                photo_bytes = st.session_state.task_photos[task_key]
+                photo_base64 = base64.b64encode(st.session_state.task_photos[task_key]).decode('utf-8')
 
-                photo_base64 = base64.b64encode(photo_bytes).decode('utf-8')
-
-                # Insert individual log for this task
                 try:
-                    response = supabase.table('closing_logs').insert({
+                    supabase.table('closing_logs').insert({
                         'timestamp': current_time,
                         'employee_name': employee_name,
                         'station': f"{station} - {task}",
                         'photo_data': photo_base64,
-                        'status': "APPROVED" # Since it passed AI at the camera stage
+                        'status': "APPROVED"
                     }).execute()
                 except Exception as e:
-                    st.error(f"Database error on task '{task}': {str(e)}")
+                    st.error(f"Database error: {e}")
                     all_success = False
                     break
 
-        if all_success:
-            st.success(f"All verifications accepted at {current_time}. You are authorized to log off.")
-            st.balloons()
-            # Clear session state for next user
-            st.session_state.task_photos = {}
-            st.session_state.active_camera = None
-            st.session_state.current_station = station
+            if all_success:
+                st.success("🎉 All duties passed and logged successfully. Great job!")
+                st.balloons()
+                if st.button("Close Shift & Restart"):
+                    st.session_state.task_photos = {}
+                    st.session_state.verification_results = None
+                    st.rerun()
+    else:
+        st.warning("Some duties failed verification. Please retake the failed photos above.")

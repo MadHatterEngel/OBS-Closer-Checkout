@@ -7,83 +7,72 @@ def get_base64_of_bin_file(bin_file):
     return base64.b64encode(data).decode()
 
 def apply_custom_css():
-    try:
-        bg_ext = "png"
-        logo_ext = "png"
-        bg_base64 = get_base64_of_bin_file("assets/background.png")
-        logo_base64 = get_base64_of_bin_file("assets/logo.png")
-    except Exception as e:
-        bg_base64 = ""
-        logo_base64 = ""
-        print(f"Warning: Missing asset files - {e}")
-
     st.markdown(
         f"""
         <style>
-        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Rye&family=Roboto:wght@400;700&display=swap');
 
         /* Global App Styling - Base Background */
         .stApp {{
-            background-image: linear-gradient(rgba(5, 2, 11, 0.85), rgba(19, 8, 37, 0.9)), url("data:image/{bg_ext};base64,{bg_base64}");
-            background-size: cover;
-            background-position: center;
-            background-attachment: fixed;
-            font-family: 'Share Tech Mono', monospace;
-            color: #E8E2F2;
+            background-color: #2E1B15; /* Deep dark warm brown */
+            background-image: url("https://www.transparenttextures.com/patterns/wood-pattern.png"); /* Subtle wood texture */
+            font-family: 'Roboto', sans-serif;
+            color: #F4E8D1; /* Creamy off-white/beige for text */
         }}
 
-        /* Quantum Mad Hatter specific neon static glows */
+        /* Typography - Rustic Headers */
         h1, h2, h3, h4, h5, h6 {{
-            color: #FF00FF !important;
-            text-shadow: 0 0 5px #FF00FF, 0 0 10px #FF00FF, 0 0 20px #8A2BE2;
-            font-family: 'Share Tech Mono', monospace !important;
+            color: #C0392B !important; /* Earthy Red */
+            text-shadow: 1px 1px 2px #000000;
+            font-family: 'Rye', cursive !important;
+            letter-spacing: 1px;
         }}
 
         /* Input Fields & Text Areas */
         .stTextInput>div>div>input, .stSelectbox>div>div>select, .stNumberInput>div>div>input {{
-            background-color: rgba(19, 8, 37, 0.7) !important;
-            color: #00FFFF !important;
-            border: 1px solid #FF00FF !important;
-            box-shadow: 0 0 5px #FF00FF inset;
-            border-radius: 5px;
+            background-color: #4A2E24 !important;
+            color: #F4E8D1 !important;
+            border: 1px solid #8B4513 !important;
+            border-radius: 4px;
         }}
 
-        /* Button Styling - Static Neon Borders */
+        /* Button Styling - Rustic & Warm */
         .stButton>button {{
-            background-color: rgba(5, 2, 11, 0.9) !important;
-            color: #00FFFF !important;
-            border: 2px solid #00FFFF !important;
-            box-shadow: 0 0 10px #00FFFF;
+            background-color: #8B4513 !important; /* Saddle Brown */
+            color: #F4E8D1 !important;
+            border: 2px solid #5C2E16 !important;
             text-transform: uppercase;
-            letter-spacing: 2px;
-            font-weight: bold;
-            border-radius: 8px;
-            transition: none; /* No animations as strictly requested */
+            font-family: 'Rye', cursive;
+            font-size: 1.1rem !important;
+            letter-spacing: 1px;
+            border-radius: 4px;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+            transition: none; /* No animations */
         }}
 
         /* Button hover/active (static color change only, no animation) */
         .stButton>button:hover, .stButton>button:active {{
-            background-color: #00FFFF !important;
-            color: #05020B !important;
-            border-color: #FF00FF !important;
-            box-shadow: 0 0 15px #FF00FF !important;
+            background-color: #C0392B !important; /* Switch to earthy red on hover */
+            color: #FFFFFF !important;
+            border-color: #8B0000 !important;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.8) !important;
             transition: none;
         }}
 
         /* DataFrame / Tables */
         [data-testid="stTable"], [data-testid="stDataFrame"] {{
-            background-color: rgba(19, 8, 37, 0.8) !important;
-            border: 1px solid #FF00FF !important;
-            border-radius: 8px;
+            background-color: rgba(74, 46, 36, 0.9) !important;
+            border: 2px solid #8B4513 !important;
+            border-radius: 4px;
         }}
 
         /* Containers */
         [data-testid="stVerticalBlock"] > [style*="flex-direction: column;"] > [data-testid="stVerticalBlock"] {{
-            background-color: rgba(5, 2, 11, 0.6) !important;
-            border: 1px solid #8A2BE2 !important;
+            background-color: rgba(46, 27, 21, 0.8) !important;
+            border: 2px solid #5C2E16 !important;
             padding: 15px;
-            border-radius: 10px;
-            box-shadow: 0 0 8px #8A2BE2;
+            border-radius: 8px;
+            box-shadow: 4px 4px 10px rgba(0,0,0,0.6);
         }}
 
         /* Top Navigation/Header Bar Fixes */
@@ -91,31 +80,37 @@ def apply_custom_css():
             background: transparent !important;
         }}
 
-        /* Add Logo at top left conceptually using css if stApp is selected, but best placed in sidebar/header via python.
-           We'll provide a class to wrap logos safely */
+        /* Warning/Error Banners */
+        .stAlert {{
+            background-color: rgba(192, 57, 43, 0.2) !important;
+            border: 1px solid #C0392B !important;
+            color: #F4E8D1 !important;
+        }}
+
+        /* Logo Styling */
         .mh-logo {{
-            border-radius: 50%;
-            box-shadow: 0 0 20px #FF00FF, 0 0 40px #00FFFF;
-            border: 3px solid #8A2BE2;
+            border-radius: 8px;
+            border: 4px solid #8B4513;
             max-width: 150px;
             display: block;
             margin-left: auto;
             margin-right: auto;
             margin-bottom: 20px;
+            box-shadow: 3px 3px 8px rgba(0,0,0,0.7);
         }}
 
         /* Tabs styling */
         button[data-baseweb="tab"] {{
-            background-color: rgba(5, 2, 11, 0.9) !important;
-            color: #00FFFF !important;
-            border: 1px solid #8A2BE2 !important;
+            background-color: #4A2E24 !important;
+            color: #F4E8D1 !important;
+            border: 1px solid #8B4513 !important;
             border-bottom: none !important;
+            font-family: 'Rye', cursive;
         }}
         button[data-baseweb="tab"][aria-selected="true"] {{
-            background-color: #FF00FF !important;
-            color: #05020B !important;
-            border-color: #FF00FF !important;
-            box-shadow: 0 0 10px #FF00FF inset;
+            background-color: #8B4513 !important;
+            color: #FFFFFF !important;
+            border-color: #5C2E16 !important;
         }}
 
         </style>

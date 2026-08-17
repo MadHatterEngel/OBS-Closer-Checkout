@@ -13,9 +13,9 @@ from ai_validator import validate_photo_with_ai
 apply_custom_css()
 
 try:
-    with open("assets/logo.png", "rb") as f:
+    with open("assets/logo.svg", "rb") as f:
         logo_data = base64.b64encode(f.read()).decode()
-    st.sidebar.markdown(f'<img src="data:image/png;base64,{logo_data}" class="mh-logo">', unsafe_allow_html=True)
+    st.sidebar.markdown(f'<img src="data:image/svg+xml;base64,{logo_data}" class="mh-logo">', unsafe_allow_html=True)
 except:
     pass
 
