@@ -1,5 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
-  <rect width="200" height="200" fill="#2E1B15" />
-  <text x="50%" y="45%" dominant-baseline="middle" text-anchor="middle" font-family="Arial, sans-serif" font-size="40" font-weight="bold" fill="#C0392B">OUTBACK</text>
-  <text x="50%" y="65%" dominant-baseline="middle" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" fill="#8B4513">STEAKHOUSE</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 150">
+  <!-- Transparent background -->
+  <rect width="400" height="150" fill="transparent" />
+
+  <!-- Outback Red Mountain Silhouette / Roofline -->
+  <path d="M 50,70 L 100,45 L 120,55 L 180,30 L 230,45 L 260,35 L 350,70 Z" fill="#E41B23" />
+
+  <!-- OUTBACK Text Base -->
+  <text x="200" y="105" font-family="'Arial Black', Impact, sans-serif" font-size="65" font-weight="900" font-stretch="condensed" letter-spacing="-2" fill="#E41B23" text-anchor="middle" dominant-baseline="middle">OUTBACK</text>
+
+  <!-- Subtle outline to define text against background if needed -->
+  <text x="200" y="105" font-family="'Arial Black', Impact, sans-serif" font-size="65" font-weight="900" font-stretch="condensed" letter-spacing="-2" fill="none" stroke="#FFFFFF" stroke-width="1.5" text-anchor="middle" dominant-baseline="middle">OUTBACK</text>
+
+  <!-- STEAKHOUSE Text Base -->
+  <text x="200" y="135" font-family="Arial, sans-serif" font-size="18" font-weight="bold" letter-spacing="6" fill="#333333" text-anchor="middle" dominant-baseline="middle">STEAKHOUSE</text>
 </svg>

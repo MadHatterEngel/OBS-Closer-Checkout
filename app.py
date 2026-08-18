@@ -190,32 +190,37 @@ else:
                 st.rerun()
 
     if all_passed:
-        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        with st.spinner("Submitting final logs..."):
-            all_success = True
-            for task in tasks_for_station:
-                task_key = f"{station}_{task}"
-                photo_base64 = base64.b64encode(st.session_state.task_photos[task_key]).decode('utf-8')
+        if not st.session_state.get('submission_complete', False):
+            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            with st.spinner("Submitting final logs..."):
+                all_success = True
+                for task in tasks_for_station:
+                    task_key = f"{station}_{task}"
+                    photo_base64 = base64.b64encode(st.session_state.task_photos[task_key]).decode('utf-8')
 
-                try:
-                    supabase.table('closing_logs').insert({
-                        'timestamp': current_time,
-                        'employee_name': employee_name,
-                        'station': f"{station} - {task}",
-                        'photo_data': photo_base64,
-                        'status': "APPROVED"
-                    }).execute()
-                except Exception as e:
-                    st.error(f"Database error: {e}")
-                    all_success = False
-                    break
+                    try:
+                        supabase.table('closing_logs').insert({
+                            'timestamp': current_time,
+                            'employee_name': employee_name,
+                            'station': f"{station} - {task}",
+                            'photo_data': photo_base64,
+                            'status': "APPROVED"
+                        }).execute()
+                    except Exception as e:
+                        st.error(f"Database error: {e}")
+                        all_success = False
+                        break
 
-            if all_success:
-                st.success("🎉 All duties passed and logged successfully. Great job!")
-                st.balloons()
-                if st.button("Close Shift & Restart"):
-                    st.session_state.task_photos = {}
-                    st.session_state.verification_results = None
+                if all_success:
+                    st.session_state.submission_complete = True
                     st.rerun()
+        else:
+            st.success("🎉 All duties passed and logged successfully. Great job!")
+            st.balloons()
+            if st.button("Close Shift & Restart"):
+                st.session_state.task_photos = {}
+                st.session_state.verification_results = None
+                st.session_state.submission_complete = False
+                st.rerun()
     else:
         st.warning("Some duties failed verification. Please retake the failed photos above.")
