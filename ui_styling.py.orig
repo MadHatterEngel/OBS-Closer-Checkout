@@ -59,15 +59,6 @@ def apply_custom_css():
             transition: none;
         }}
 
-        /* Disabled Button styling */
-        .stButton>button[disabled] {{
-            background-color: #3e2723 !important;
-            color: #8d6e63 !important;
-            border-color: #3e2723 !important;
-            box-shadow: none !important;
-            cursor: not-allowed !important;
-        }}
-
         /* DataFrame / Tables */
         [data-testid="stTable"], [data-testid="stDataFrame"] {{
             background-color: rgba(74, 46, 36, 0.9) !important;

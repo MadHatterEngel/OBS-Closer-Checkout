@@ -1,0 +1,18 @@
+--- ui_styling.py
++++ ui_styling.py
+@@ -43,6 +43,15 @@
+             box-shadow: 2px 2px 5px rgba(0,0,0,0.8) !important;
+             transition: none;
+         }
++
++        /* Disabled Button styling */
++        .stButton>button[disabled] {
++            background-color: #3e2723 !important;
++            color: #8d6e63 !important;
++            border-color: #3e2723 !important;
++            box-shadow: none !important;
++            cursor: not-allowed !important;
++        }
+
+         /* DataFrame / Tables */
+         [data-testid="stTable"], [data-testid="stDataFrame"] {
