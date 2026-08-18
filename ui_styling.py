@@ -52,12 +52,12 @@ def apply_custom_css():
             border: none !important;
             text-transform: uppercase;
             font-weight: 800 !important;
-            font-size: 1rem !important;
+            font-size: 0.9rem !important;
             letter-spacing: 0.5px;
             border-radius: 6px;
             box-shadow: none !important;
             transition: background-color 0.2s ease-in-out;
-            padding: 10px 20px;
+            padding: 6px 12px;
         }}
 
         /* Button hover/active (Smooth transition, no shadows) */
@@ -88,8 +88,8 @@ def apply_custom_css():
         [data-testid="stVerticalBlock"] > [style*="flex-direction: column;"] > [data-testid="stVerticalBlock"] {{
             background-color: #2D2A28 !important; /* Very dark, sleek, neutral brown-grey */
             border: none !important;
-            padding: 20px;
-            border-radius: 12px;
+            padding: 8px 12px; margin-bottom: -10px;
+            border-radius: 6px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.05); /* Very subtle modern shadow */
             color: #FFFFFF !important;
         }}
@@ -126,11 +126,11 @@ def apply_custom_css():
 
         /* Logo Styling */
         .mh-logo {{
-            max-width: 200px;
+            max-width: 150px;
             display: block;
             margin-left: auto;
             margin-right: auto;
-            margin-bottom: 30px;
+            margin-bottom: 10px; margin-top: -30px;
         }}
 
         /* Tabs styling */
@@ -153,3 +153,24 @@ def apply_custom_css():
         """,
         unsafe_allow_html=True
     )
+
+def apply_mobile_tweaks():
+    st.markdown("""
+    <style>
+    /* Force Streamlit main container to be wider and have less padding on mobile */
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+        max-width: 100% !important;
+    }
+
+    /* Make typography tighter */
+    h1 { font-size: 1.5rem !important; margin-bottom: 0px !important; padding-bottom: 0px !important; }
+    h2 { font-size: 1.2rem !important; margin-bottom: 0px !important; padding-bottom: 0px !important; }
+    h3 { font-size: 1.0rem !important; }
+    p { margin-bottom: 0.2rem !important; font-size: 0.9rem !important; }
+    hr { margin: 0.5em 0 !important; }
+    </style>
+    """, unsafe_allow_html=True)
