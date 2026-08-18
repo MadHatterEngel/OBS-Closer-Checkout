@@ -7,6 +7,7 @@ st.set_page_config(
 
 import base64
 from datetime import datetime
+import concurrent.futures
 from config import supabase, fetch_station_tasks
 from ai_validator import validate_photo_with_ai
 from ui_styling import apply_custom_css
@@ -93,25 +94,42 @@ if st.session_state.verification_results is None:
         if not employee_name:
             st.error("Employee Identifier is required.")
         else:
-            with st.spinner("🤖 AI Auditing all photos... this may take a moment."):
+            with st.spinner("🤖 AI Auditing all photos simultaneously..."):
                 results = {}
-                for task in tasks_for_station:
-                    task_key = f"{station}_{task}"
-                    photo_bytes = st.session_state.task_photos[task_key]
+                task_keys = [f"{station}_{task}" for task in tasks_for_station]
 
-                    baseline_bytes = None
-                    strictness = 5
-                    try:
-                        ref_response = supabase.table('ai_references').select('photo_data, strictness').eq('task_key', task_key).execute()
-                        if ref_response.data and len(ref_response.data) > 0:
-                            ref_record = ref_response.data[0]
-                            baseline_bytes = base64.b64decode(ref_record['photo_data'])
-                            strictness = ref_record['strictness']
-                    except Exception as e:
-                        print(f"Failed to check reference: {e}")
+                # 1. Batch fetch all references for this station in one DB call
+                references = {}
+                try:
+                    ref_response = supabase.table('ai_references').select('task_key, photo_data, strictness').in_('task_key', task_keys).execute()
+                    if ref_response.data:
+                        for row in ref_response.data:
+                            references[row['task_key']] = {
+                                'photo_data': base64.b64decode(row['photo_data']),
+                                'strictness': row['strictness']
+                            }
+                except Exception as e:
+                    print(f"Failed to fetch references: {e}")
 
-                    ai_res = validate_photo_with_ai(baseline_bytes, photo_bytes, strictness)
-                    results[task_key] = ai_res
+                # Helper for threading
+                def verify_single(t_key, p_bytes, b_bytes, strict):
+                    res = validate_photo_with_ai(b_bytes, p_bytes, strict)
+                    return t_key, res
+
+                # 2. Process all AI validations in parallel
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future_to_task = {}
+                    for tk in task_keys:
+                        # Extract data safely on the main thread
+                        p_bytes = st.session_state.task_photos[tk]
+                        b_bytes = references.get(tk, {}).get('photo_data')
+                        strict = references.get(tk, {}).get('strictness', 5)
+                        future = executor.submit(verify_single, tk, p_bytes, b_bytes, strict)
+                        future_to_task[future] = tk
+
+                    for future in concurrent.futures.as_completed(future_to_task):
+                        tk, res = future.result()
+                        results[tk] = res
 
                 st.session_state.verification_results = results
                 st.rerun()
@@ -168,25 +186,39 @@ else:
 
     if not all_passed:
         if st.button("Re-Verify Pending Duties", type="primary", use_container_width=True):
-            with st.spinner("🤖 Re-evaluating updated photos..."):
-                for task in tasks_for_station:
-                    task_key = f"{station}_{task}"
-                    # Only re-verify those that failed or were retaken
-                    if st.session_state.verification_results[task_key]["status"] != "PASS":
-                        photo_bytes = st.session_state.task_photos[task_key]
-                        baseline_bytes = None
-                        strictness = 5
-                        try:
-                            ref_response = supabase.table('ai_references').select('photo_data, strictness').eq('task_key', task_key).execute()
-                            if ref_response.data and len(ref_response.data) > 0:
-                                ref_record = ref_response.data[0]
-                                baseline_bytes = base64.b64decode(ref_record['photo_data'])
-                                strictness = ref_record['strictness']
-                        except Exception as e:
-                            print(f"Failed to check reference: {e}")
+            with st.spinner("🤖 Re-evaluating updated photos simultaneously..."):
+                tasks_to_verify = [f"{station}_{task}" for task in tasks_for_station if st.session_state.verification_results[f"{station}_{task}"]["status"] != "PASS"]
 
-                        ai_res = validate_photo_with_ai(baseline_bytes, photo_bytes, strictness)
-                        st.session_state.verification_results[task_key] = ai_res
+                if tasks_to_verify:
+                    references = {}
+                    try:
+                        ref_response = supabase.table('ai_references').select('task_key, photo_data, strictness').in_('task_key', tasks_to_verify).execute()
+                        if ref_response.data:
+                            for row in ref_response.data:
+                                references[row['task_key']] = {
+                                    'photo_data': base64.b64decode(row['photo_data']),
+                                    'strictness': row['strictness']
+                                }
+                    except Exception as e:
+                        print(f"Failed to fetch references: {e}")
+
+                    def verify_single(t_key, p_bytes, b_bytes, strict):
+                        res = validate_photo_with_ai(b_bytes, p_bytes, strict)
+                        return t_key, res
+
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future_to_task = {}
+                        for tk in tasks_to_verify:
+                            p_bytes = st.session_state.task_photos[tk]
+                            b_bytes = references.get(tk, {}).get('photo_data')
+                            strict = references.get(tk, {}).get('strictness', 5)
+                            future = executor.submit(verify_single, tk, p_bytes, b_bytes, strict)
+                            future_to_task[future] = tk
+
+                        for future in concurrent.futures.as_completed(future_to_task):
+                            tk, res = future.result()
+                            st.session_state.verification_results[tk] = res
+
                 st.rerun()
 
     if all_passed:
