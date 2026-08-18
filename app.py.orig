@@ -78,18 +78,15 @@ if st.session_state.verification_results is None:
 
                 # Custom component returns base64 string: "data:image/jpeg;base64,..."
                 if img_data:
-                    if img_data != st.session_state.get(f"raw_cam_{task_key}"):
-                        st.session_state[f"raw_cam_{task_key}"] = img_data
-                        # Strip the metadata header
-                        base64_str = img_data.split(',')[1]
-                        photo_bytes = base64.b64decode(base64_str)
-                        st.session_state.task_photos[task_key] = photo_bytes
-                        st.rerun()
+                    # Strip the metadata header
+                    base64_str = img_data.split(',')[1]
+                    photo_bytes = base64.b64decode(base64_str)
+                    st.session_state.task_photos[task_key] = photo_bytes
+                    st.rerun()
 
         st.markdown("---")
 
-    can_submit = len(st.session_state.task_photos) == len(tasks_for_station)
-    if st.button("Verify & Submit All", type="primary", use_container_width=True, disabled=not can_submit):
+    if st.button("Verify & Submit All", type="primary", use_container_width=True, disabled=not all_photos_captured):
         if not employee_name:
             st.error("Employee Identifier is required.")
         else:
