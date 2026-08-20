@@ -1,35 +1,14 @@
-import json
-import os
-import streamlit as st
-from supabase import create_client, Client
+import re
 
-DATA_DIR = os.path.dirname(os.path.abspath(__file__))
-# DB_PATH = os.path.join(DATA_DIR, "compliance.db") # No longer needed
+with open('config.py', 'r') as f:
+    content = f.read()
 
-@st.cache_resource
-def init_connection():
-    # Try multiple ways to retrieve the Supabase secrets
-    url = None
-    key = None
+# Make sure json is imported
+if 'import json' not in content:
+    content = "import json\n" + content
 
-    if "supabase" in st.secrets:
-        url = st.secrets["supabase"].get("URL")
-        key = st.secrets["supabase"].get("KEY")
-
-    if not url:
-        url = st.secrets.get("SUPABASE_URL", os.environ.get("SUPABASE_URL"))
-    if not key:
-        key = st.secrets.get("SUPABASE_KEY", os.environ.get("SUPABASE_KEY"))
-
-    if not url or not key:
-        raise ValueError("Supabase URL or KEY not found in Streamlit secrets or environment variables.")
-
-    return create_client(url, key)
-
-# Initialize Supabase client
-supabase: Client = init_connection()
-
-@st.cache_data
+# Replace fetch_station_tasks function
+new_fetch_func = '''@st.cache_data
 def fetch_station_tasks():
     """
     Fetches station tasks dynamically from the Supabase station_tasks table.
@@ -68,3 +47,9 @@ def fetch_station_tasks():
         except Exception as e2:
             print(f"Error loading defaults: {e2}")
             return {}
+'''
+
+content = re.sub(r'@st\.cache_data\ndef fetch_station_tasks\(\):.*?(?=\n\n|\Z)', new_fetch_func, content, flags=re.DOTALL)
+
+with open('config.py', 'w') as f:
+    f.write(content)

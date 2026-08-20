@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120">
+  <rect width="400" height="120" fill="transparent" />
+
+  <!-- Modern, sleek flat red roofline -->
+  <path d="M 100,50 L 140,35 L 200,45 L 260,35 L 300,50 Z" fill="#E41B23" />
+
+  <!-- Clean, bold modern sans-serif text -->
+  <text x="200" y="85" font-family="'Inter', 'Roboto', sans-serif" font-size="55" font-weight="900" letter-spacing="-1" fill="#E41B23" text-anchor="middle" dominant-baseline="middle">OUTBACK</text>
+
+  <text x="200" y="110" font-family="'Inter', 'Roboto', sans-serif" font-size="16" font-weight="600" letter-spacing="4" fill="#2C2C2C" text-anchor="middle" dominant-baseline="middle">STEAKHOUSE</text>
+</svg>

@@ -222,8 +222,7 @@ with tab2:
 
     st.markdown(f"### {selected_station} Tasks")
 
-    for task_dict in station_tasks[selected_station]:
-        task = task_dict['task']
+    for task in station_tasks[selected_station]:
         task_key = f"{selected_station}_{task}"
 
         with st.expander(f"Task: {task}"):
@@ -319,15 +318,10 @@ with tab3:
             st.markdown(f"**Current Tasks for {station}**")
 
             # Display current tasks with a delete button for each
-            for i, task_dict in enumerate(tasks):
-                task = task_dict['task']
+            for i, task in enumerate(tasks):
                 col_task, col_del = st.columns([4, 1])
                 with col_task:
-                    st.write(f"- **{task}**")
-                    if task_dict.get('day_of_week'):
-                        st.caption(f"📅 Daily: {task_dict['day_of_week']}")
-                    if task_dict.get('details'):
-                        st.caption(f"ℹ️ Details: {task_dict['details'][:50]}...")
+                    st.write(f"- {task}")
                 with col_del:
                     if st.button("🗑️ Delete", key=f"del_task_{station}_{i}"):
                         try:
@@ -343,23 +337,15 @@ with tab3:
             # Form to add a new task to this station
             with st.form(key=f"add_task_form_{station}"):
                 new_task_desc = st.text_input("New Task Description", placeholder="e.g., Sanitize countertops")
-                new_day = st.selectbox("Assign to specific Day (Optional)", ["None", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"], key=f"day_{station}")
-                new_details = st.text_area("Task Details / Restock Chart (Optional)", placeholder="List items here...")
                 submit_new_task = st.form_submit_button("➕ Add Task")
 
                 if submit_new_task:
                     if new_task_desc.strip():
                         try:
-                            insert_data = {
+                            supabase.table('station_tasks').insert({
                                 "station": station,
                                 "task": new_task_desc.strip()
-                            }
-                            if new_day != "None":
-                                insert_data["day_of_week"] = new_day
-                            if new_details.strip():
-                                insert_data["details"] = new_details.strip()
-
-                            supabase.table('station_tasks').insert(insert_data).execute()
+                            }).execute()
                             fetch_station_tasks.clear()
                             st.success(f"Task added to {station}!")
                             st.rerun()

@@ -1,0 +1,6 @@
+streamlit>=1.33.0
+pandas
+Pillow
+plotly
+supabase
+google-genai

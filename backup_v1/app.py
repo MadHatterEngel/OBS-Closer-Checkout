@@ -47,27 +47,13 @@ if 'submission_complete' not in st.session_state: st.session_state.submission_co
 if 'sequential_mode' not in st.session_state: st.session_state.sequential_mode = False
 if 'capture_queue' not in st.session_state: st.session_state.capture_queue = []
 
-from datetime import datetime
-current_day = datetime.now().strftime('%A')
-raw_tasks = STATION_TASKS[station]
-filtered_tasks = []
-daily_tasks = []
-for t in raw_tasks:
-    if isinstance(t, str):
-        filtered_tasks.append({'task': t})
-    elif t.get('day_of_week'):
-        if t['day_of_week'] == current_day:
-            daily_tasks.append(t)
-    else:
-        filtered_tasks.append(t)
-tasks_for_station = filtered_tasks + daily_tasks
+tasks_for_station = STATION_TASKS[station]
 
 # --- MODE 1: COLLECTION ---
 if st.session_state.verification_results is None:
 
     missing_tasks = []
-    for task_dict in tasks_for_station:
-        task = task_dict['task']
+    for task in tasks_for_station:
         task_key = f"{station}_{task}"
         if task_key not in st.session_state.task_photos:
             missing_tasks.append((task_key, task))
@@ -104,25 +90,17 @@ if st.session_state.verification_results is None:
         if not auto_submit:
             # Display current staged status compactly
             cols = st.columns(2)
-            for idx, task_dict in enumerate(tasks_for_station):
-                task = task_dict['task']
+            for idx, task in enumerate(tasks_for_station):
                 task_key = f"{station}_{task}"
                 with cols[idx % 2]:
                     with st.container():
-                        display_task = f"**{task}** (Daily)" if task_dict.get('day_of_week') else task
                         if task_key in st.session_state.task_photos:
-                            st.success(f"✅ {display_task}")
-                            if task_dict.get('details'):
-                                with st.expander("ℹ️ Restock Details"):
-                                    st.write(task_dict['details'])
+                            st.success(f"✅ {task}")
                             if st.button("Retake", key=f"retake_btn_{task_key}"):
                                 del st.session_state.task_photos[task_key]
                                 st.rerun()
                         else:
-                            st.error(f"❌ {display_task}")
-                            if task_dict.get('details'):
-                                with st.expander("ℹ️ Restock Details"):
-                                    st.write(task_dict['details'])
+                            st.error(f"❌ {task}")
                             # Give option to take it right here if they don't want sequential
                             img_data = native_camera(key=f"cam_{task_key}")
                             if img_data:
@@ -151,7 +129,7 @@ if st.session_state.verification_results is None:
                     # Threaded Batch AI Verification
                     with st.spinner("🤖 AI Auditing all photos simultaneously..."):
                         results = {}
-                        task_keys = [f"{station}_{t['task']}" for t in tasks_for_station]
+                        task_keys = [f"{station}_{task}" for task in tasks_for_station]
                         references = {}
                         try:
                             ref_response = supabase.table('ai_references').select('task_key, photo_data, strictness').in_('task_key', task_keys).execute()
@@ -190,17 +168,12 @@ else:
     results = st.session_state.verification_results
     all_passed = True
 
-    for task_dict in tasks_for_station:
-        task = task_dict['task']
-        display_task = f"**{task}** (Daily)" if task_dict.get('day_of_week') else task
+    for task in tasks_for_station:
         task_key = f"{station}_{task}"
         res = results[task_key]
 
         with st.container():
-            st.markdown(f"**{display_task}**")
-            if task_dict.get('details'):
-                with st.expander("ℹ️ Restock Details"):
-                    st.write(task_dict['details'])
+            st.markdown(f"**{task}**")
 
             if res["status"] == "FAIL":
                 all_passed = False
@@ -236,7 +209,7 @@ else:
     if not all_passed:
         if st.button("Re-Verify Pending Duties", type="primary", use_container_width=True):
             with st.spinner("🤖 Re-evaluating updated photos simultaneously..."):
-                tasks_to_verify = [f"{station}_{t['task']}" for t in tasks_for_station if st.session_state.verification_results[f"{station}_{t['task']}"]["status"] != "PASS"]
+                tasks_to_verify = [f"{station}_{task}" for task in tasks_for_station if st.session_state.verification_results[f"{station}_{task}"]["status"] != "PASS"]
                 if tasks_to_verify:
                     references = {}
                     try:
@@ -273,8 +246,7 @@ else:
             current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             with st.spinner("Submitting final logs..."):
                 all_success = True
-                for task_dict in tasks_for_station:
-                    task = task_dict['task']
+                for task in tasks_for_station:
                     task_key = f"{station}_{task}"
                     photo_base64 = base64.b64encode(st.session_state.task_photos[task_key]).decode('utf-8')
                     try:
