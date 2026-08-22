@@ -325,7 +325,7 @@ with tab3:
             # Display current tasks with a delete button for each
             for i, task_dict in enumerate(tasks):
                 task = task_dict['task']
-                task_id = task_dict['id']
+                task_id = task_dict.get('id', f"{station}_{i}")
 
                 if st.session_state.edit_task_id == task_id:
                     with st.container():
