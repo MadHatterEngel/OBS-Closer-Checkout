@@ -115,7 +115,7 @@ if st.session_state.verification_results is None:
                             if task_dict.get('details'):
                                 with st.expander("ℹ️ Restock Details"):
                                     st.write(task_dict['details'])
-                            if st.button("Retake", key=f"retake_btn_{task_key}"):
+                            if st.button("Retake", key=f"retake_btn_{task_key}_{idx}"):
                                 del st.session_state.task_photos[task_key]
                                 st.rerun()
                         else:
@@ -124,7 +124,7 @@ if st.session_state.verification_results is None:
                                 with st.expander("ℹ️ Restock Details"):
                                     st.write(task_dict['details'])
                             # Give option to take it right here if they don't want sequential
-                            img_data = native_camera(key=f"cam_{task_key}")
+                            img_data = native_camera(key=f"cam_{task_key}_{idx}")
                             if img_data:
                                 if img_data != st.session_state.get(f"raw_cam_{task_key}"):
                                     st.session_state[f"raw_cam_{task_key}"] = img_data
@@ -190,7 +190,7 @@ else:
     results = st.session_state.verification_results
     all_passed = True
 
-    for task_dict in tasks_for_station:
+    for idx, task_dict in enumerate(tasks_for_station):
         task = task_dict['task']
         display_task = f"**{task}** (Daily)" if task_dict.get('day_of_week') else task
         task_key = f"{station}_{task}"
@@ -208,7 +208,7 @@ else:
                 if res.get('feedback'):
                     st.warning(f"🔍 AI Feedback: {res['feedback']}")
 
-                img_data = native_camera(key=f"retake_cam_{task_key}")
+                img_data = native_camera(key=f"retake_cam_{task_key}_{idx}")
                 if img_data:
                     if img_data != st.session_state.get(f"raw_cam_{task_key}"):
                         st.session_state[f"raw_cam_{task_key}"] = img_data
@@ -220,7 +220,7 @@ else:
             elif res["status"] == "RETAKEN":
                 all_passed = False
                 st.info("🔄 Photo updated. Ready for re-verification.")
-                img_data = native_camera(key=f"retake_cam2_{task_key}")
+                img_data = native_camera(key=f"retake_cam2_{task_key}_{idx}")
                 if img_data:
                     if img_data != st.session_state.get(f"raw_cam2_{task_key}"):
                         st.session_state[f"raw_cam2_{task_key}"] = img_data

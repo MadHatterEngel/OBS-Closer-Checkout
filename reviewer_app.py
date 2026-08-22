@@ -222,9 +222,10 @@ with tab2:
 
     st.markdown(f"### {selected_station} Tasks")
 
-    for task_dict in station_tasks[selected_station]:
+    for idx, task_dict in enumerate(station_tasks[selected_station]):
         task = task_dict['task']
         task_key = f"{selected_station}_{task}"
+        ui_key = f"{task_key}_{idx}"
 
         with st.expander(f"Task: {task}"):
             col_img, col_settings = st.columns(2)
@@ -246,18 +247,18 @@ with tab2:
 
             with col_settings:
                 # Uploader for new reference
-                new_image = st.file_uploader(f"Upload New Reference", type=["jpg", "jpeg", "png"], key=f"up_{task_key}")
+                new_image = st.file_uploader(f"Upload New Reference", type=["jpg", "jpeg", "png"], key=f"up_{ui_key}")
 
                 # Strictness slider
                 new_strictness = st.slider(
                     "AI Strictness Level",
                     min_value=1, max_value=10, value=current_strictness,
                     help="1 = Very loose (passes almost anything), 10 = Very strict (must look exactly like reference)",
-                    key=f"slider_{task_key}"
+                    key=f"slider_{ui_key}"
                 )
 
-                test_image = st.file_uploader(f"Upload Test Image (Evaluates current slider value without saving)", type=["jpg", "jpeg", "png"], key=f"test_{task_key}")
-                if st.button("🔬 Test AI Strictness", key=f"test_btn_{task_key}"):
+                test_image = st.file_uploader(f"Upload Test Image (Evaluates current slider value without saving)", type=["jpg", "jpeg", "png"], key=f"test_{ui_key}")
+                if st.button("🔬 Test AI Strictness", key=f"test_btn_{ui_key}"):
                     if test_image is not None:
                         # Determine which baseline to use (the newly uploaded one, or the existing one)
                         baseline_bytes = None
@@ -281,7 +282,7 @@ with tab2:
                         st.warning("Upload a test image first.")
 
                 st.markdown("---")
-                if st.button("Save AI Settings", type="primary", key=f"save_{task_key}"):
+                if st.button("Save AI Settings", type="primary", key=f"save_{ui_key}"):
                     update_data = {"strictness": new_strictness}
 
                     if new_image is not None:
