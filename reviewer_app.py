@@ -348,7 +348,20 @@ with tab3:
                                     st.session_state.edit_task_id = None
                                     st.rerun()
                                 except Exception as e:
-                                    st.error(f"Error updating task: {e}")
+                                    # Fallback for PGRST204 (missing schema cache / columns)
+                                    if 'PGRST204' in str(e) or 'could not find' in str(e).lower():
+                                        try:
+                                            fallback_data = {"task": edit_desc.strip()}
+                                            supabase.table('station_tasks').update(fallback_data).eq('id', task_id).execute()
+                                            fetch_station_tasks.clear()
+                                            st.warning("Task updated, but 'day_of_week' and 'details' columns are missing in the database. Please run the SQL migration.")
+                                            st.session_state.edit_task_id = None
+                                            st.rerun()
+                                        except Exception as e2:
+                                            st.error(f"Error updating task: {e2}")
+                                    else:
+                                        st.error(f"Error updating task: {e}")
+
                         with col_cancel:
                             if st.button("❌ Cancel", key=f"cancel_edit_{task_id}"):
                                 st.session_state.edit_task_id = None
@@ -401,7 +414,20 @@ with tab3:
                             st.success(f"Task added to {station}!")
                             st.rerun()
                         except Exception as e:
-                            st.error(f"Error adding task: {e}")
+                            if 'PGRST204' in str(e) or 'could not find' in str(e).lower():
+                                try:
+                                    fallback_data = {
+                                        "station": station,
+                                        "task": new_task_desc.strip()
+                                    }
+                                    supabase.table('station_tasks').insert(fallback_data).execute()
+                                    fetch_station_tasks.clear()
+                                    st.warning("Task added, but 'day_of_week' and 'details' columns are missing in the database. Please run the SQL migration.")
+                                    st.rerun()
+                                except Exception as e2:
+                                    st.error(f"Error adding task: {e2}")
+                            else:
+                                st.error(f"Error adding task: {e}")
                     else:
                         st.warning("Task description cannot be empty.")
 
