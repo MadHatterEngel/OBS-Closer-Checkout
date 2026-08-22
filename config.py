@@ -36,7 +36,7 @@ def fetch_station_tasks():
     Returns a dictionary mapping station names to a list of task dictionaries.
     """
     try:
-        response = supabase.table('station_tasks').select('station, task, day_of_week, details').execute()
+        response = supabase.table('station_tasks').select('id, station, task, day_of_week, details').execute()
         tasks_data = response.data
 
         # Group tasks by station
@@ -46,7 +46,7 @@ def fetch_station_tasks():
             if station not in station_tasks:
                 station_tasks[station] = []
 
-            task_dict = {"task": row['task']}
+            task_dict = {"id": row['id'], "task": row['task']}
             if row.get('day_of_week'):
                 task_dict["day_of_week"] = row['day_of_week']
             if row.get('details'):
@@ -64,7 +64,13 @@ def fetch_station_tasks():
         print(f"Warning: Failed to fetch tasks from Supabase ({e}). Using fallback defaults.")
         try:
             with open(os.path.join(DATA_DIR, 'default_tasks.json'), 'r') as f:
-                return json.load(f)
+                data = json.load(f)
+                mock_id = 1
+                for station, tasks in data.items():
+                    for task in tasks:
+                        task['id'] = mock_id
+                        mock_id += 1
+                return data
         except Exception as e2:
             print(f"Error loading defaults: {e2}")
             return {}

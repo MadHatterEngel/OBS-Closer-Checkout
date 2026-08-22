@@ -309,6 +309,9 @@ with tab2:
 
 with tab3:
     st.subheader("⚙️ Station Requirements Management")
+    if 'edit_task_id' not in st.session_state:
+        st.session_state.edit_task_id = None
+
     st.markdown("Modify, add, or remove check-out stations and their specific tasks. Changes instantly reflect on the closer application.")
 
     # Reload fresh station tasks
@@ -322,22 +325,55 @@ with tab3:
             # Display current tasks with a delete button for each
             for i, task_dict in enumerate(tasks):
                 task = task_dict['task']
-                col_task, col_del = st.columns([4, 1])
-                with col_task:
-                    st.write(f"- **{task}**")
-                    if task_dict.get('day_of_week'):
-                        st.caption(f"📅 Daily: {task_dict['day_of_week']}")
-                    if task_dict.get('details'):
-                        st.caption(f"ℹ️ Details: {task_dict['details'][:50]}...")
-                with col_del:
-                    if st.button("🗑️ Delete", key=f"del_task_{station}_{i}"):
-                        try:
-                            supabase.table('station_tasks').delete().eq('station', station).eq('task', task).execute()
-                            fetch_station_tasks.clear()
-                            st.success(f"Task '{task}' removed.")
+                task_id = task_dict['id']
+
+                if st.session_state.edit_task_id == task_id:
+                    with st.container():
+                        edit_desc = st.text_input("Edit Task Description", value=task, key=f"edit_desc_{task_id}")
+                        current_day = task_dict.get('day_of_week', "None")
+                        day_options = ["None", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+                        edit_day = st.selectbox("Assign to specific Day (Optional)", day_options, index=day_options.index(current_day) if current_day in day_options else 0, key=f"edit_day_{task_id}")
+                        edit_details = st.text_area("Task Details / Restock Chart (Optional)", value=task_dict.get('details', ''), key=f"edit_det_{task_id}")
+
+                        col_save, col_cancel = st.columns(2)
+                        with col_save:
+                            if st.button("💾 Save Changes", type="primary", key=f"save_edit_{task_id}"):
+                                try:
+                                    update_data = {"task": edit_desc.strip()}
+                                    update_data["day_of_week"] = edit_day if edit_day != "None" else None
+                                    update_data["details"] = edit_details.strip() if edit_details.strip() else None
+
+                                    supabase.table('station_tasks').update(update_data).eq('id', task_id).execute()
+                                    fetch_station_tasks.clear()
+                                    st.session_state.edit_task_id = None
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Error updating task: {e}")
+                        with col_cancel:
+                            if st.button("❌ Cancel", key=f"cancel_edit_{task_id}"):
+                                st.session_state.edit_task_id = None
+                                st.rerun()
+                else:
+                    col_task, col_edit, col_del = st.columns([3, 1, 1])
+                    with col_task:
+                        st.write(f"- **{task}**")
+                        if task_dict.get('day_of_week'):
+                            st.caption(f"📅 Daily: {task_dict['day_of_week']}")
+                        if task_dict.get('details'):
+                            st.caption(f"ℹ️ Details: {task_dict['details'][:50]}...")
+                    with col_edit:
+                        if st.button("✏️ Edit", key=f"edit_task_{station}_{i}"):
+                            st.session_state.edit_task_id = task_id
                             st.rerun()
-                        except Exception as e:
-                            st.error(f"Error deleting task: {e}")
+                    with col_del:
+                        if st.button("🗑️ Delete", key=f"del_task_{station}_{i}"):
+                            try:
+                                supabase.table('station_tasks').delete().eq('id', task_id).execute()
+                                fetch_station_tasks.clear()
+                                st.success(f"Task '{task}' removed.")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Error deleting task: {e}")
 
             st.markdown("---")
             st.markdown("**Add New Task**")
