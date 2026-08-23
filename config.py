@@ -36,7 +36,14 @@ def fetch_station_tasks():
     Returns a dictionary mapping station names to a list of task dictionaries.
     """
     try:
-        response = supabase.table('station_tasks').select('id, station, task, day_of_week, details').execute()
+        try:
+            response = supabase.table('station_tasks').select('id, station, task, day_of_week, details').execute()
+        except Exception as sel_e:
+            if 'PGRST204' in str(sel_e) or 'could not find' in str(sel_e).lower():
+                response = supabase.table('station_tasks').select('id, station, task').execute()
+            else:
+                raise sel_e
+
         tasks_data = response.data
 
         # Group tasks by station
