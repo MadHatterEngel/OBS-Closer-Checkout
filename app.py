@@ -3,6 +3,7 @@ st.set_page_config(page_title="Outback Station Validator", page_icon="🥩", lay
 
 import base64
 from datetime import datetime
+import uuid
 import concurrent.futures
 from config import supabase, fetch_station_tasks
 from ai_validator import validate_photo_with_ai
@@ -47,7 +48,6 @@ if 'submission_complete' not in st.session_state: st.session_state.submission_co
 if 'sequential_mode' not in st.session_state: st.session_state.sequential_mode = False
 if 'capture_queue' not in st.session_state: st.session_state.capture_queue = []
 
-from datetime import datetime
 current_day = datetime.now().strftime('%A')
 raw_tasks = STATION_TASKS[station]
 filtered_tasks = []
@@ -276,13 +276,28 @@ else:
                 for task_dict in tasks_for_station:
                     task = task_dict['task']
                     task_key = f"{station}_{task}"
-                    photo_base64 = base64.b64encode(st.session_state.task_photos[task_key]).decode('utf-8')
+                    photo_bytes = st.session_state.task_photos[task_key]
                     try:
+                        # 1. Upload to Storage Bucket
+                        file_ext = "jpg"
+                        file_name = f"{current_time.replace(' ', '_').replace(':', '-')}_{uuid.uuid4().hex[:8]}.{file_ext}"
+
+                        supabase.storage.from_('closing-photos').upload(
+                            file_name,
+                            photo_bytes,
+                            {"content-type": "image/jpeg"}
+                        )
+
+                        # 2. Get Public URL
+                        public_url = supabase.storage.from_('closing-photos').get_public_url(file_name)
+
+                        # 3. Save to Database
                         supabase.table('closing_logs').insert({
                             'timestamp': current_time,
                             'employee_name': employee_name,
                             'station': f"{station} - {task}",
-                            'photo_data': photo_base64,
+                            'image_url': public_url,
+                            'photo_data': None, # Deprecated the base64 column
                             'status': "APPROVED"
                         }).execute()
                     except Exception as e:

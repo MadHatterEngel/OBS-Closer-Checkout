@@ -50,7 +50,7 @@ with tab1:
     def fetch_logs():
         try:
             # Increased limit so a single multi-task checkout isn't cut off
-            response = supabase.table('closing_logs').select('id, timestamp, employee_name, station, photo_data, status').order('id', desc=True).limit(250).execute()
+            response = supabase.table('closing_logs').select('id, timestamp, employee_name, station, photo_data, image_url, status').order('id', desc=True).limit(250).execute()
             return response.data
         except Exception as e:
             st.error(f"Database error: {str(e)}")
@@ -82,7 +82,8 @@ with tab1:
         checkouts[checkout_key]['tasks'].append({
             'id': log['id'],
             'task_name': task_name,
-            'photo_data': log['photo_data'],
+            'photo_data': log.get('photo_data'),
+            'image_url': log.get('image_url'),
             'status': log['status']
         })
 
@@ -122,16 +123,19 @@ with tab1:
                     col = cols[idx % 3] # Distribute evenly across the 3 columns
                     with col:
                         st.markdown(f"**{task['task_name']}**")
-                        if task['photo_data']:
+                        if task.get('image_url') or task.get('photo_data'):
                             # Implement lazy loading to prevent massive DOM slow-downs
                             # Store a unique key for this image in session state
                             view_key = f"view_img_{task['id']}"
 
                             if st.session_state.get(view_key, False):
                                 try:
-                                    photo_bytes = base64.b64decode(task['photo_data'])
-                                    image = Image.open(io.BytesIO(photo_bytes))
-                                    st.image(image, use_container_width=True)
+                                    if task.get('image_url'):
+                                        st.image(task['image_url'], use_container_width=True)
+                                    else:
+                                        photo_bytes = base64.b64decode(task['photo_data'])
+                                        image = Image.open(io.BytesIO(photo_bytes))
+                                        st.image(image, use_container_width=True)
 
                                     if st.button("Hide Image", key=f"hide_btn_{task['id']}"):
                                         st.session_state[view_key] = False
