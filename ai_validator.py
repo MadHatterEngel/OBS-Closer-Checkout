@@ -231,9 +231,9 @@ def validate_bulk_photos_with_ai(tasks_list, station_name, references_dict, subm
         for i, t in enumerate(tasks_list):
             task_key = f"{station_name}_{t['task']}"
             results[task_key] = {
-                "status": "PASS",
+                "status": "FAIL",
                 "confidence": 0.0,
-                "reason": f"AI error occurred, auto-passed: {str(e)}",
+                "reason": f"AI error occurred: {str(e)}",
                 "feedback": ""
             }
             fake_photos[task_key] = submission_bytes_list[0]

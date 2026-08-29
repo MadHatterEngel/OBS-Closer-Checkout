@@ -8,7 +8,7 @@ import concurrent.futures
 from config import supabase, fetch_station_tasks
 from ai_validator import validate_photo_with_ai
 from ui_styling import apply_custom_css, apply_mobile_tweaks
-from components import native_camera
+from components import native_camera, bulk_uploader
 
 apply_custom_css()
 apply_mobile_tweaks()
@@ -28,6 +28,10 @@ col1, col2 = st.columns(2)
 with col1:
     employee_name = st.text_input("Employee Identifier", placeholder="Your name")
 with col2:
+    if not STATION_TASKS:
+        st.error("No stations configured. Please contact your manager.")
+        st.stop()
+
     if 'current_station' not in st.session_state:
         st.session_state.current_station = list(STATION_TASKS.keys())[0]
     station = st.selectbox("Station", list(STATION_TASKS.keys()))
@@ -77,17 +81,26 @@ if st.session_state.verification_results is None:
                 st.caption(f"  *Restock: {task_dict['details']}*")
 
     st.markdown("### 2. Upload & Process")
-    uploaded_files = st.file_uploader("Select photos from your Camera Roll", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
-    if uploaded_files:
-        st.success(f"{len(uploaded_files)} photos selected.")
+    # Custom bulk uploader component that compresses client-side to bypass Android memory limits
+    compressed_base64_list = bulk_uploader(key="bulk_uploader_comp")
+
+    submission_bytes_list = []
+    if compressed_base64_list:
+        for b64_str in compressed_base64_list:
+            # The JS component returns standard data:image/jpeg;base64,... strings
+            clean_b64 = b64_str.split(',')[1] if ',' in b64_str else b64_str
+            submission_bytes_list.append(base64.b64decode(clean_b64))
+
+    if submission_bytes_list:
+        st.success(f"{len(submission_bytes_list)} photos processed & ready.")
         # Show a quick gallery
         cols = st.columns(3)
-        for idx, f in enumerate(uploaded_files):
+        for idx, b_bytes in enumerate(submission_bytes_list):
             with cols[idx % 3]:
-                st.image(f, use_container_width=True)
+                st.image(b_bytes, use_container_width=True)
 
-    if st.button("🤖 Process & Verify Station", type="primary", use_container_width=True, disabled=not uploaded_files):
+    if st.button("🤖 Process & Verify Station", type="primary", use_container_width=True, disabled=not submission_bytes_list):
         if not employee_name:
             st.error("Employee Identifier is required.")
         else:
@@ -107,9 +120,6 @@ if st.session_state.verification_results is None:
                             }
                 except Exception as e:
                     print(f"Failed to fetch references: {e}")
-
-                # Read all uploaded bytes
-                submission_bytes_list = [f.getvalue() for f in uploaded_files]
 
                 # We need to map tasks to photos and grade them
                 results, mapped_photos = validate_bulk_photos_with_ai(tasks_for_station, station, references, submission_bytes_list)

@@ -354,6 +354,9 @@ with tab3:
     # Reload fresh station tasks
     station_tasks = fetch_station_tasks()
 
+    if not station_tasks:
+        st.info("No stations or tasks found. Create a new station or restore defaults.")
+
     # Use expanders for existing stations
     for station, tasks in station_tasks.items():
         with st.expander(f"Station: {station}"):

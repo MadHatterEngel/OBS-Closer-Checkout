@@ -28,6 +28,10 @@ col1, col2 = st.columns(2)
 with col1:
     employee_name = st.text_input("Employee Identifier", placeholder="Your name")
 with col2:
+    if not STATION_TASKS:
+        st.error("No stations configured. Please contact your manager.")
+        st.stop()
+
     if 'current_station' not in st.session_state:
         st.session_state.current_station = list(STATION_TASKS.keys())[0]
     station = st.selectbox("Station", list(STATION_TASKS.keys()))

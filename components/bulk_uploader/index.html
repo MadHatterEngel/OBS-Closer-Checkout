@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: transparent;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .upload-btn {
+      background-color: #E2231A; /* Outback Red */
+      color: white;
+      padding: 12px 24px;
+      font-size: 16px;
+      font-weight: 600;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+      box-shadow: 0px 2px 4px rgba(0,0,0,0.1);
+      transition: background-color 0.2s;
+    }
+    .upload-btn:hover {
+      background-color: #C11B13;
+    }
+    #file-input {
+      display: none;
+    }
+    #status {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <label for="file-input" class="upload-btn">
+    📁 Select Multiple Photos
+  </label>
+  <input type="file" id="file-input" multiple accept="image/*" />
+  <div id="status"></div>
+
+  <script>
+    function sendMessageToStreamlitClient(type, data) {
+        const outData = Object.assign({
+            isStreamlitMessage: true,
+            type: type,
+        }, data);
+        window.parent.postMessage(outData, "*");
+    }
+
+    const fileInput = document.getElementById('file-input');
+    const statusDiv = document.getElementById('status');
+
+    fileInput.addEventListener('change', async (event) => {
+        const files = event.target.files;
+        if (files.length === 0) return;
+
+        statusDiv.innerText = `Processing ${files.length} photos... please wait.`;
+        sendMessageToStreamlitClient("streamlit:setFrameHeight", {height: document.body.scrollHeight + 50});
+
+        const compressedImages = [];
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+
+            // Convert to base64 via canvas compression
+            const base64Data = await compressImage(file);
+            if (base64Data) {
+                compressedImages.push(base64Data);
+            }
+        }
+
+        statusDiv.innerText = `Successfully processed ${compressedImages.length} photos!`;
+
+        // Send array of base64 strings back to python
+        sendMessageToStreamlitClient("streamlit:setComponentValue", {value: compressedImages});
+    });
+
+    function compressImage(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+
+                    const MAX_SIZE = 1080;
+                    if (width > height) {
+                        if (width > MAX_SIZE) {
+                            height *= MAX_SIZE / width;
+                            width = MAX_SIZE;
+                        }
+                    } else {
+                        if (height > MAX_SIZE) {
+                            width *= MAX_SIZE / height;
+                            height = MAX_SIZE;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // Output as JPEG with 0.8 quality
+                    const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                    resolve(compressedDataUrl);
+                };
+                img.onerror = error => reject(error);
+            };
+            reader.onerror = error => reject(error);
+        });
+    }
+
+    // Initialize component
+    window.onload = function() {
+        sendMessageToStreamlitClient("streamlit:componentReady", {apiVersion: 1});
+        sendMessageToStreamlitClient("streamlit:setFrameHeight", {height: document.body.scrollHeight + 30});
+    };
+  </script>
+</body>
+</html>
