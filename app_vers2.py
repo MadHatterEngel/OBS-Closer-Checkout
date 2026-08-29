@@ -82,25 +82,47 @@ if st.session_state.verification_results is None:
 
     st.markdown("### 2. Upload & Process")
 
+    # Initialize session state for batch uploads if not present
+    if "submission_bytes_list" not in st.session_state:
+        st.session_state.submission_bytes_list = []
+
+    if "last_uploader_val" not in st.session_state:
+        st.session_state.last_uploader_val = None
+
     # Custom bulk uploader component that compresses client-side to bypass Android memory limits
     compressed_base64_list = bulk_uploader(key="bulk_uploader_comp")
 
-    submission_bytes_list = []
-    if compressed_base64_list:
+    if compressed_base64_list and compressed_base64_list != st.session_state.last_uploader_val:
+        st.session_state.last_uploader_val = compressed_base64_list
+        new_bytes = []
         for b64_str in compressed_base64_list:
             # The JS component returns standard data:image/jpeg;base64,... strings
             clean_b64 = b64_str.split(',')[1] if ',' in b64_str else b64_str
-            submission_bytes_list.append(base64.b64decode(clean_b64))
+            new_bytes.append(base64.b64decode(clean_b64))
 
-    if submission_bytes_list:
-        st.success(f"{len(submission_bytes_list)} photos processed & ready.")
-        # Show a quick gallery
-        cols = st.columns(3)
-        for idx, b_bytes in enumerate(submission_bytes_list):
-            with cols[idx % 3]:
+        # Append new uploads to session state and clear component state to prevent re-adding on reruns
+        st.session_state.submission_bytes_list.extend(new_bytes)
+        st.rerun()
+
+    if st.session_state.submission_bytes_list:
+        st.success(f"{len(st.session_state.submission_bytes_list)} photos processed & ready.")
+        # Show a 5-column gallery with remove options
+        cols = st.columns(5)
+
+        # We must keep track of indices to delete to avoid modifying list during iteration
+        idx_to_remove = None
+
+        for idx, b_bytes in enumerate(st.session_state.submission_bytes_list):
+            with cols[idx % 5]:
                 st.image(b_bytes, use_container_width=True)
+                if st.button("❌", key=f"remove_thumb_{idx}", help="Remove this photo", use_container_width=True):
+                    idx_to_remove = idx
 
-    if st.button("🤖 Process & Verify Station", type="primary", use_container_width=True, disabled=not submission_bytes_list):
+        if idx_to_remove is not None:
+            st.session_state.submission_bytes_list.pop(idx_to_remove)
+            st.rerun()
+
+    if st.button("🤖 Process & Verify Station", type="primary", use_container_width=True, disabled=not st.session_state.submission_bytes_list):
         if not employee_name:
             st.error("Employee Identifier is required.")
         else:
@@ -122,7 +144,7 @@ if st.session_state.verification_results is None:
                     print(f"Failed to fetch references: {e}")
 
                 # We need to map tasks to photos and grade them
-                results, mapped_photos = validate_bulk_photos_with_ai(tasks_for_station, station, references, submission_bytes_list)
+                results, mapped_photos = validate_bulk_photos_with_ai(tasks_for_station, station, references, st.session_state.submission_bytes_list)
 
                 st.session_state.verification_results = results
                 st.session_state.task_photos = mapped_photos
