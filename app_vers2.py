@@ -252,6 +252,10 @@ else:
                         # 2. Get Public URL
                         public_url = supabase.storage.from_('closing-photos').get_public_url(file_name)
 
+                        # Validate the URL before writing to DB
+                        if not public_url or not isinstance(public_url, str) or len(public_url.strip()) < 10:
+                            raise Exception("Failed to generate a valid public URL from Supabase Storage.")
+
                         # 3. Save to Database
                         supabase.table('closing_logs').insert({
                             'timestamp': current_time,

@@ -123,14 +123,18 @@ with tab1:
                     col = cols[idx % 3] # Distribute evenly across the 3 columns
                     with col:
                         st.markdown(f"**{task['task_name']}**")
-                        if task.get('image_url') or task.get('photo_data'):
+                        # Ensure the string is actually valid and not just an empty string ""
+                        valid_url = task.get('image_url') and str(task['image_url']).strip() != ""
+                        valid_base64 = task.get('photo_data') and str(task['photo_data']).strip() != ""
+
+                        if valid_url or valid_base64:
                             # Implement lazy loading to prevent massive DOM slow-downs
                             # Store a unique key for this image in session state
                             view_key = f"view_img_{task['id']}"
 
                             if st.session_state.get(view_key, False):
                                 try:
-                                    if task.get('image_url'):
+                                    if valid_url:
                                         st.image(task['image_url'], use_container_width=True)
                                     else:
                                         photo_bytes = base64.b64decode(task['photo_data'])
