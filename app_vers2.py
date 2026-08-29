@@ -106,17 +106,36 @@ if st.session_state.verification_results is None:
 
     if st.session_state.submission_bytes_list:
         st.success(f"{len(st.session_state.submission_bytes_list)} photos processed & ready.")
-        # Show a 5-column gallery with remove options
-        cols = st.columns(5)
+
+        # Inject CSS to force side-by-side columns on mobile by targeting the gallery container specifically.
+        # This overrides Streamlit's default media queries that stack columns.
+        st.markdown("""
+        <div data-testid="gallery-anchor"></div>
+        <style>
+            /* Streamlit wraps markdown and columns in div.element-container.
+               We find the element-container holding this anchor, then target the sibling element-container holding the horizontal block */
+            div.element-container:has([data-testid="gallery-anchor"]) ~ div.element-container [data-testid="stHorizontalBlock"] {
+                flex-wrap: wrap !important;
+            }
+            div.element-container:has([data-testid="gallery-anchor"]) ~ div.element-container [data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+                min-width: calc(20% - 1rem) !important;
+                width: calc(20% - 1rem) !important;
+                flex: 1 1 calc(20% - 1rem) !important;
+            }
+        </style>
+        """, unsafe_allow_html=True)
 
         # We must keep track of indices to delete to avoid modifying list during iteration
         idx_to_remove = None
 
-        for idx, b_bytes in enumerate(st.session_state.submission_bytes_list):
-            with cols[idx % 5]:
-                st.image(b_bytes, use_container_width=True)
-                if st.button("❌", key=f"remove_thumb_{idx}", help="Remove this photo", use_container_width=True):
-                    idx_to_remove = idx
+        with st.container():
+            cols = st.columns(5)
+
+            for idx, b_bytes in enumerate(st.session_state.submission_bytes_list):
+                with cols[idx % 5]:
+                    st.image(b_bytes, use_container_width=True)
+                    if st.button("❌", key=f"remove_thumb_{idx}", help="Remove this photo", use_container_width=True):
+                        idx_to_remove = idx
 
         if idx_to_remove is not None:
             st.session_state.submission_bytes_list.pop(idx_to_remove)
