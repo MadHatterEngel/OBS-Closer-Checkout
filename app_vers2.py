@@ -107,22 +107,21 @@ if st.session_state.verification_results is None:
     if st.session_state.submission_bytes_list:
         st.success(f"{len(st.session_state.submission_bytes_list)} photos processed & ready.")
 
-        # Inject CSS to force side-by-side columns on mobile by targeting the gallery container specifically.
-        # This overrides Streamlit's default media queries that stack columns.
-        # We must keep track of indices to delete to avoid modifying list during iteration
-        idx_to_remove = None
+        with st.expander("🔍 Review & Edit Photos", expanded=False):
+            # We must keep track of indices to delete to avoid modifying list during iteration
+            idx_to_remove = None
 
-        cols = st.columns(5)
+            cols = st.columns(5)
 
-        for idx, b_bytes in enumerate(st.session_state.submission_bytes_list):
-            with cols[idx % 5]:
-                st.image(b_bytes, use_container_width=True)
-                if st.button("❌", key=f"remove_thumb_{idx}", help="Remove this photo", use_container_width=True):
-                    idx_to_remove = idx
+            for idx, b_bytes in enumerate(st.session_state.submission_bytes_list):
+                with cols[idx % 5]:
+                    st.image(b_bytes, use_container_width=True)
+                    if st.button("❌ Remove", key=f"remove_thumb_{idx}", help="Remove this photo", use_container_width=True):
+                        idx_to_remove = idx
 
-        if idx_to_remove is not None:
-            st.session_state.submission_bytes_list.pop(idx_to_remove)
-            st.rerun()
+            if idx_to_remove is not None:
+                st.session_state.submission_bytes_list.pop(idx_to_remove)
+                st.rerun()
 
     if st.button("🤖 Process & Verify Station", type="primary", use_container_width=True, disabled=not st.session_state.submission_bytes_list):
         if not employee_name:
