@@ -60,10 +60,8 @@ def validate_photo_with_ai(baseline_image_bytes, submission_photo_bytes, strictn
         """
 
         # Use gemini-3.6-flash as it is fast and supports multimodal inputs
-        response = client.models.generate_content(
-            model='gemini-3.6-flash',
-            contents=[prompt, img_baseline, img_submission]
-        )
+        chat = client.chats.create(model='gemini-3.6-flash')
+        response = chat.send_message([prompt, img_baseline, img_submission])
         response_text = response.text.strip()
 
         # Parse response
@@ -170,10 +168,8 @@ def validate_bulk_photos_with_ai(tasks_list, station_name, references_dict, subm
 
         contents = [prompt] + submission_images
 
-        response = client.models.generate_content(
-            model='gemini-3.6-flash',
-            contents=contents
-        )
+        chat = client.chats.create(model='gemini-3.6-flash')
+        response = chat.send_message(contents)
         response_text = response.text.strip()
 
         # Parse response

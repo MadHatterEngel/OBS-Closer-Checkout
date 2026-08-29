@@ -11,7 +11,7 @@ def native_camera(key=None):
 
 _bulk_uploader_func = components.declare_component(
     "bulk_uploader",
-    path=os.path.join(os.path.dirname(__file__), "bulk_uploader")
+    path=os.path.join(os.path.dirname(__file__), "bulk_uploader_comp")
 )
 
 def bulk_uploader(key=None):
