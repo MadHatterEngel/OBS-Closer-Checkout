@@ -109,34 +109,15 @@ if st.session_state.verification_results is None:
 
         # Inject CSS to force side-by-side columns on mobile by targeting the gallery container specifically.
         # This overrides Streamlit's default media queries that stack columns.
-        # Generate HTML for a flexbox grid of thumbnails
-        import base64
-        html_images = ""
-        for idx, b_bytes in enumerate(st.session_state.submission_bytes_list):
-            b64_encoded = base64.b64encode(b_bytes).decode("utf-8")
-            html_images += f'''
-            <div style="flex: 1 1 calc(20% - 10px); min-width: 60px; max-width: 20%; box-sizing: border-box; text-align: center;">
-                <img src="data:image/jpeg;base64,{b64_encoded}" style="width: 100%; border-radius: 4px; object-fit: cover; aspect-ratio: 1/1;" />
-            </div>
-            '''
-
-        grid_html = f'''
-        <div style="display: flex; flex-wrap: wrap; gap: 10px; width: 100%; margin-bottom: 10px;">
-            {html_images}
-        </div>
-        '''
-        st.markdown(grid_html, unsafe_allow_html=True)
-
-        st.write("Select a photo to remove it:")
-
         # We must keep track of indices to delete to avoid modifying list during iteration
         idx_to_remove = None
 
-        # We still need Streamlit buttons for interaction, we render them below the HTML grid as a row of small buttons
-        cols = st.columns(len(st.session_state.submission_bytes_list))
-        for idx in range(len(st.session_state.submission_bytes_list)):
-            with cols[idx]:
-                if st.button(f"❌ {idx+1}", key=f"remove_thumb_{idx}", help="Remove this photo"):
+        cols = st.columns(5)
+
+        for idx, b_bytes in enumerate(st.session_state.submission_bytes_list):
+            with cols[idx % 5]:
+                st.image(b_bytes, use_container_width=True)
+                if st.button("❌", key=f"remove_thumb_{idx}", help="Remove this photo", use_container_width=True):
                     idx_to_remove = idx
 
         if idx_to_remove is not None:
@@ -296,4 +277,6 @@ else:
                 st.session_state.task_photos = {}
                 st.session_state.verification_results = None
                 st.session_state.submission_complete = False
+                st.session_state.submission_bytes_list = []
+                st.session_state.last_uploader_val = None
                 st.rerun()
