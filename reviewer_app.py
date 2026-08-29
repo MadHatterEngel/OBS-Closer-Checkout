@@ -123,9 +123,12 @@ with tab1:
                     col = cols[idx % 3] # Distribute evenly across the 3 columns
                     with col:
                         st.markdown(f"**{task['task_name']}**")
-                        # Ensure the string is actually valid and not just an empty string ""
-                        valid_url = task.get('image_url') and str(task['image_url']).strip() != ""
-                        valid_base64 = task.get('photo_data') and str(task['photo_data']).strip() != ""
+                        # Ensure the string is actually valid and not just an empty string "" or None
+                        raw_url = str(task.get('image_url')).strip()
+                        raw_base64 = str(task.get('photo_data')).strip()
+
+                        valid_url = raw_url != "" and raw_url != "None"
+                        valid_base64 = raw_base64 != "" and raw_base64 != "None"
 
                         if valid_url or valid_base64:
                             # Implement lazy loading to prevent massive DOM slow-downs
@@ -136,10 +139,12 @@ with tab1:
                                 try:
                                     if valid_url:
                                         st.image(task['image_url'], use_container_width=True)
-                                    else:
+                                    elif valid_base64:
                                         photo_bytes = base64.b64decode(task['photo_data'])
                                         image = Image.open(io.BytesIO(photo_bytes))
                                         st.image(image, use_container_width=True)
+                                    else:
+                                        st.error("Invalid image data state.")
 
                                     if st.button("Hide Image", key=f"hide_btn_{task['id']}"):
                                         st.session_state[view_key] = False
