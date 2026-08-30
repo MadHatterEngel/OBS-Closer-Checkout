@@ -92,6 +92,12 @@ with tab1:
     if not logs:
         st.info("No compliance logs detected in the database.")
     else:
+        if st.button("🐞 Debug Latest Log Payload"):
+            debug_log = dict(logs[0])
+            if debug_log.get("photo_data"):
+                debug_log["photo_data"] = f"<BASE64 DATA OMITTED FOR SIZE: {len(debug_log['photo_data'])} bytes>"
+            st.json(debug_log)
+
         # Summary Metrics
         col1, col2, col3 = st.columns(3)
         col1.metric("Total Checkouts", len(checkouts))
