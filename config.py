@@ -61,10 +61,6 @@ def fetch_station_tasks():
 
             station_tasks[station].append(task_dict)
 
-        # If empty database, fallback to defaults to prevent index errors
-        if not station_tasks:
-            raise ValueError("No tasks found in database")
-
         return station_tasks
 
     except Exception as e:
