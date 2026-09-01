@@ -128,9 +128,16 @@ with tab1:
                     col = cols[idx % 3] # Distribute evenly across the 3 columns
                     with col:
                         st.markdown(f"**{task['task_name']}**")
-                        # Ensure the URL is actually valid and not just an empty string or "None"
-                        raw_url = str(task.get('image_url')).strip()
-                        valid_url = raw_url != "" and raw_url != "None"
+                        
+                        # Fixed URL validation logic
+                        image_url = task.get('image_url')
+                        valid_url = (
+                            image_url is not None and 
+                            isinstance(image_url, str) and 
+                            image_url.strip() and 
+                            image_url.strip() != "None" and
+                            len(image_url.strip()) > 10
+                        )
 
                         if valid_url:
                             # Implement lazy loading to prevent massive DOM slow-downs
@@ -139,13 +146,14 @@ with tab1:
 
                             if st.session_state.get(view_key, False):
                                 try:
-                                    st.image(task['image_url'], use_container_width=True)
+                                    st.image(image_url, use_container_width=True)
 
                                     if st.button("Hide Image", key=f"hide_btn_{task['id']}"):
                                         st.session_state[view_key] = False
                                         st.rerun()
                                 except Exception as e:
                                     st.error(f"Failed to load image URL: {str(e)}")
+                                    st.caption(f"URL attempted: {image_url[:60]}...")
                             else:
                                 if st.button("🖼️ View Photo", key=f"show_btn_{task['id']}"):
                                     st.session_state[view_key] = True
