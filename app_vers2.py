@@ -262,7 +262,6 @@ else:
                             'employee_name': employee_name,
                             'station': f"{station} - {task}",
                             'image_url': public_url,
-                            'photo_data': None, # Deprecated the base64 column
                             'status': "APPROVED"
                         }).execute()
                     except Exception as e:
