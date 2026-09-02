@@ -4,6 +4,7 @@ st.set_page_config(page_title="Manager Command Center", page_icon="👁️", lay
 import pandas as pd
 import io
 import base64
+import uuid
 from PIL import Image
 from config import supabase, fetch_station_tasks
 from ui_styling import apply_custom_css
@@ -252,12 +253,12 @@ with tab2:
             with col_img:
                 st.markdown("**Current Reference Image**")
                 if ref_data and ref_data['photo_data']:
-                    try:
-                        photo_bytes = base64.b64decode(ref_data['photo_data'])
-                        image = Image.open(io.BytesIO(photo_bytes))
-                        st.image(image, use_container_width=True)
-                    except Exception:
-                        st.error("Failed to render existing image.")
+                    # We expect a Supabase Storage URL here
+                    img_val = ref_data['photo_data']
+                    if img_val and str(img_val).strip() not in ['', 'None'] and img_val.startswith('http'):
+                        st.image(img_val, use_container_width=True)
+                    else:
+                        st.error("Invalid or legacy reference image format.")
                 else:
                     st.info("No reference image uploaded.")
 
@@ -281,10 +282,18 @@ with tab2:
                         if new_image is not None:
                             baseline_bytes = new_image.getvalue()
                         elif ref_data and ref_data['photo_data']:
-                            baseline_bytes = base64.b64decode(ref_data['photo_data'])
+                            img_val = ref_data['photo_data']
+                            if img_val and str(img_val).strip() not in ['', 'None'] and img_val.startswith('http'):
+                                import requests
+                                try:
+                                    resp = requests.get(img_val)
+                                    if resp.status_code == 200:
+                                        baseline_bytes = resp.content
+                                except Exception:
+                                    pass
 
                         if not baseline_bytes:
-                            st.warning("You must upload a Reference image first before testing.")
+                            st.warning("You must upload a Reference image first before testing. (Or wait for the current reference URL to load).")
                         else:
                             with st.spinner("Testing current strictness..."):
                                 ai_res = validate_photo_with_ai(baseline_bytes, test_image.getvalue(), new_strictness)
@@ -304,7 +313,24 @@ with tab2:
                     if new_image is not None:
                         # Process uploaded image
                         img_bytes = new_image.getvalue()
-                        update_data["photo_data"] = base64.b64encode(img_bytes).decode('utf-8')
+
+                        try:
+                            # Upload to Supabase Storage
+                            file_name = f"ref_{uuid.uuid4()}.jpg"
+                            supabase.storage.from_('closing-photos').upload(
+                                file_name,
+                                img_bytes,
+                                {"content-type": "image/jpeg"}
+                            )
+                            # Get Public URL
+                            public_url = supabase.storage.from_('closing-photos').get_public_url(file_name)
+                            if not public_url or len(public_url.strip()) < 10:
+                                raise Exception("Failed to generate a valid public URL.")
+
+                            update_data["photo_data"] = public_url
+                        except Exception as upload_err:
+                            st.error(f"Failed to upload image to storage: {upload_err}")
+                            st.stop()
 
                     try:
                         if ref_data:
