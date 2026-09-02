@@ -137,8 +137,19 @@ if st.session_state.verification_results is None:
                     ref_response = supabase.table('ai_references').select('task_key, photo_data, strictness').in_('task_key', task_keys).execute()
                     if ref_response.data:
                         for row in ref_response.data:
+                            import requests
+                            img_val = row['photo_data']
+                            baseline_bytes = None
+                            if img_val and str(img_val).strip() not in ['', 'None'] and img_val.startswith('http'):
+                                try:
+                                    resp = requests.get(img_val)
+                                    if resp.status_code == 200:
+                                        baseline_bytes = resp.content
+                                except Exception:
+                                    pass
+
                             references[row['task_key']] = {
-                                'photo_data': base64.b64decode(row['photo_data']),
+                                'photo_data': baseline_bytes,
                                 'strictness': row['strictness']
                             }
                 except Exception as e:
@@ -204,8 +215,19 @@ else:
                         ref_response = supabase.table('ai_references').select('task_key, photo_data, strictness').in_('task_key', tasks_to_verify).execute()
                         if ref_response.data:
                             for row in ref_response.data:
+                                import requests
+                                img_val = row['photo_data']
+                                baseline_bytes = None
+                                if img_val and str(img_val).strip() not in ['', 'None'] and img_val.startswith('http'):
+                                    try:
+                                        resp = requests.get(img_val)
+                                        if resp.status_code == 200:
+                                            baseline_bytes = resp.content
+                                    except Exception:
+                                        pass
+
                                 references[row['task_key']] = {
-                                    'photo_data': base64.b64decode(row['photo_data']),
+                                    'photo_data': baseline_bytes,
                                     'strictness': row['strictness']
                                 }
                     except Exception as e:
@@ -262,7 +284,6 @@ else:
                             'employee_name': employee_name,
                             'station': f"{station} - {task}",
                             'image_url': public_url,
-                            'photo_data': None, # Deprecated the base64 column
                             'status': "APPROVED"
                         }).execute()
                     except Exception as e:
