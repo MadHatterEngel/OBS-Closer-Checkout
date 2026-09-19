@@ -82,7 +82,7 @@ if st.session_state.verification_results is None:
             for task_dict in main_tasks:
                 st.markdown(f"- **{task_dict['task']}**")
                 if task_dict.get('details'):
-                    st.caption(f"  *Details: {task_dict['details']}*")
+                    st.caption(f"  *{task_dict['details']}*")
         else:
             st.info("No main tasks.")
 
@@ -91,7 +91,7 @@ if st.session_state.verification_results is None:
                 for task_dict in deep_clean_tasks:
                     st.markdown(f"- **{task_dict['task']}**")
                     if task_dict.get('details'):
-                        st.caption(f"  *Details: {task_dict['details']}*")
+                        st.caption(f"  *{task_dict['details']}*")
 
     st.markdown("### 2. Upload & Process")
 
