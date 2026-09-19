@@ -411,7 +411,7 @@ with tab3:
                         current_day = task_dict.get('day_of_week', "None")
                         day_options = ["None", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
                         edit_day = st.selectbox("Assign to specific Day (Optional)", day_options, index=day_options.index(current_day) if current_day in day_options else 0, key=f"edit_day_{task_id}")
-                        edit_details = st.text_area("Task Details / Restock Chart (Optional)", value=task_dict.get('details', ''), key=f"edit_det_{task_id}")
+                        edit_details = st.text_area("Task Details (Optional)", value=task_dict.get('details', ''), key=f"edit_det_{task_id}")
 
                         col_save, col_cancel = st.columns(2)
                         with col_save:
@@ -472,7 +472,7 @@ with tab3:
             with st.form(key=f"add_task_form_{station}"):
                 new_task_desc = st.text_input("New Task Description", placeholder="e.g., Sanitize countertops")
                 new_day = st.selectbox("Assign to specific Day (Optional)", ["None", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"], key=f"day_{station}")
-                new_details = st.text_area("Task Details / Restock Chart (Optional)", placeholder="List items here...")
+                new_details = st.text_area("Task Details (Optional)", placeholder="List items here...")
                 submit_new_task = st.form_submit_button("➕ Add Task")
 
                 if submit_new_task:
