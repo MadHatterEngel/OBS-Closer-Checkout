@@ -37,7 +37,7 @@
             "task": "Wipe KDS screens and bump bars"
         },
         {
-            "task": "Complete Details Chart (Pans, tongs, bottles, etc.)",
+            "task": "Complete Restock Chart (Pans, tongs, bottles, etc.)",
             "details": "1x Chx grate, 1x Fish grate, 1x Meat grate, 1x Yellow tongs, 1x Blue tongs, 1x Red tongs, 1x Black tongs, 2x Green tongs, 1x Bbq brush, 2x Red scoop, 1x 1/9 pans, 1x Oil spray bottle, 1x Butter bottle, 1x Yellow cutting board, 1x Red scoop, 1x 1/6 pan, 1x Green scoop, 1x White scoop, 2x Grey scoop, 1x 5oz ladle, 3x 2Qt Cambro & Lid, 1x Tan cup, 3x Small spatula"
         },
         {
@@ -117,7 +117,7 @@
             "task": "Wipe KDS screens and bump bars"
         },
         {
-            "task": "Complete Details Chart (Pans, tongs, bottles, etc.)",
+            "task": "Complete Restock Chart (Pans, tongs, bottles, etc.)",
             "details": "1x Bbq brush, 2x Red scoop, 1x 1/9 pans, 1x Oil spray bottle, 1x Butter bottle, 1x Yellow cutting board, 1x Red scoop, 1x 1/6 pan"
         },
         {
@@ -203,7 +203,7 @@
             "task": "Clean 3 comp sink"
         },
         {
-            "task": "Complete Details Chart (Pans, tongs, bottles, etc.)",
+            "task": "Complete Restock Chart (Pans, tongs, bottles, etc.)",
             "details": "1x Chx grate, 1x Fish grate, 1x Meat grate, 2x Yellow tongs, 2x Blue tongs, 1x Red tongs, 1x Black tongs, 1x Green tongs, 1x Bbq brush, 2x Red scoop, 2x 1/9 pans, 1x Oil spray bottle, 1x Butter bottle, 1x Yellow cutting board, 1x Red scoop, 1x 1/6 pan, 2x Green scoop, 1x White scoop, 2x Grey scoop, 1x 5oz ladle, 3x 2Qt Cambro & Lid, 1x Tan cup, 3x Small spatula"
         },
         {
@@ -283,7 +283,7 @@
             "task": "Clean 3 comp sink"
         },
         {
-            "task": "Complete Details Chart (Pans, tongs, bottles, etc.)",
+            "task": "Complete Restock Chart (Pans, tongs, bottles, etc.)",
             "details": "1x Chx grate, 1x Fish grate, 1x Meat grate, 2x Yellow tongs, 2x Blue tongs, 1x Red tongs, 1x Black tongs, 1x Green tongs, 1x Bbq brush, 2x Red scoop, 2x 1/9 pans, 1x Oil spray bottle, 1x Butter bottle, 1x Yellow cutting board, 1x Red scoop, 1x 1/6 pan, 2x Green scoop, 1x White scoop, 2x Grey scoop, 1x 5oz ladle, 3x 2Qt Cambro & Lid, 1x Tan cup, 3x Small spatula"
         },
         {
@@ -354,7 +354,7 @@
             "task": "Wipe down KDS, replace saran wrap on bump bar"
         },
         {
-            "task": "Complete Details Chart (Pans, tongs, bottles, etc.)",
+            "task": "Complete Restock Chart (Pans, tongs, bottles, etc.)",
             "details": "1x Chx grate, 1x Fish grate, 1x Meat grate, 1x Yellow tongs, 1x Blue tongs, 1x Red tongs, 1x Black tongs, 2x Green tongs, 1x Green scoop, 1x White scoop, 2x Grey scoop, 1x 5oz ladle, 3x 2Qt Cambro & Lid, 1x Tan cup, 3x Small spatula"
         },
         {
@@ -416,7 +416,7 @@
             "task": "Sweep and mop behind/under the fryers"
         },
         {
-            "task": "Clean and fill fry freezer, label all items"
+            "task": "Clean and restock fry freezer, label all items"
         },
         {
             "task": "Wipe down microwave and fry pass area"
@@ -425,13 +425,13 @@
             "task": "Take all trash out and replace liners"
         },
         {
-            "task": "Clean and fill breading station"
+            "task": "Clean and restock breading station"
         },
         {
             "task": "Wipe down KDS screens"
         },
         {
-            "task": "Complete Details Chart (Pans, tongs, baskets, etc.)",
+            "task": "Complete Restock Chart (Pans, tongs, baskets, etc.)",
             "details": "6x Fry baskets, 2x Skimmers, 2x Tongs, 1x Spider, 3x 1/3 pans, 2x 1/6 pans"
         },
         {
@@ -484,7 +484,7 @@
             "task": "Flip, re-label, and fill ALL pans, flip lettuce bins, label, and return to walk-in"
         },
         {
-            "task": "Wipe down all shelves and top of station, fill all togo supplies"
+            "task": "Wipe down all shelves and top of station, restock all togo supplies"
         },
         {
             "task": "Stock and label rusks"
@@ -520,7 +520,7 @@
             "task": "Clean salad floor."
         },
         {
-            "task": "Large bowls, small bowls, and plates filled in bowl chiller."
+            "task": "Large bowls, small bowls, and plates restocked in bowl chiller."
         },
         {
             "task": "Bowl chiller wiped out"
@@ -538,10 +538,10 @@
             "task": "Sweep and mop behind/under the fryers"
         },
         {
-            "task": "Clean and fill fry freezer, label all items"
+            "task": "Clean and restock fry freezer, label all items"
         },
         {
-            "task": "Clean and fill breading station"
+            "task": "Clean and restock breading station"
         },
         {
             "task": "All personal belongings taken care of."
@@ -550,7 +550,7 @@
             "task": "Trashes run"
         },
         {
-            "task": "Complete Details Chart (Ladles, scoops, pans, etc.)",
+            "task": "Complete Restock Chart (Ladles, scoops, pans, etc.)",
             "details": "1x 2oz ladle, 3x 3oz ladle, 1x 6oz ladle, 2x 5oz ladle, 8x 1.5oz ladle, 5x 1oz ladle, 2x White scoop, 1x Tan cup, 2x Green scoop, 2x Brown lettuce scoop, 2x Blue scoop, 4x Red scoop, 1x 60 scoop, 3x 100 scoop, 4x TBSP, 1x 1/2 TBSP, 2x Stainless bowl, 2x Metal 1/9 pans, 1x 1/2 cup"
         },
         {
@@ -603,7 +603,7 @@
             "task": "Flip, re-label, and fill ALL pans, flip lettuce bins, label, and return to walk-in"
         },
         {
-            "task": "Wipe down all shelves and top of station, fill all togo supplies."
+            "task": "Wipe down all shelves and top of station, restock all togo supplies."
         },
         {
             "task": "Stock and label rusks"
@@ -639,7 +639,7 @@
             "task": "Clean salad floor."
         },
         {
-            "task": "Large bowls, small bowls, and plates filled in bowl chiller."
+            "task": "Large bowls, small bowls, and plates restocked in bowl chiller."
         },
         {
             "task": "Bowl chiller wiped out"
@@ -651,7 +651,7 @@
             "task": "Trashes run"
         },
         {
-            "task": "Complete Details Chart (Ladles, scoops, pans, etc.)",
+            "task": "Complete Restock Chart (Ladles, scoops, pans, etc.)",
             "details": "1x 2oz ladle, 3x 3oz ladle, 1x 6oz ladle, 2x 5oz ladle, 8x 1.5oz ladle, 5x 1oz ladle, 2x White scoop, 1x Tan cup, 2x Green scoop, 2x Brown lettuce scoop, 2x Blue scoop, 4x Red scoop, 1x 60 scoop, 3x 100 scoop, 4x TBSP, 1x 1/2 TBSP, 2x Stainless bowl, 2x Metal 1/9 pans, 1x 1/2 cup"
         },
         {
@@ -704,7 +704,7 @@
             "task": "Clean bloom breading station, sift flour, change water/milk wash"
         },
         {
-            "task": "Wipe down bloom reach-in cooler, fill petals/onions"
+            "task": "Wipe down bloom reach-in cooler, restock petals/onions"
         },
         {
             "task": "Filter bloom fryer oil, scrub vat"
@@ -716,7 +716,7 @@
             "task": "Wipe down cutting boards and prep area"
         },
         {
-            "task": "Details sauce ramekins and large bloom plates"
+            "task": "Restock sauce ramekins and large bloom plates"
         },
         {
             "task": "Empty grease traps and wipe down backsplash"
@@ -780,7 +780,7 @@
             "task": "Clean bloom breading station, sift flour, change water/milk wash"
         },
         {
-            "task": "Wipe down bloom reach-in cooler, fill petals/onions"
+            "task": "Wipe down bloom reach-in cooler, restock petals/onions"
         },
         {
             "task": "Filter bloom fryer oil, scrub vat"
@@ -792,7 +792,7 @@
             "task": "Wipe down cutting boards and prep area"
         },
         {
-            "task": "Details sauce ramekins and large bloom plates"
+            "task": "Restock sauce ramekins and large bloom plates"
         },
         {
             "task": "Empty grease traps and wipe down backsplash"

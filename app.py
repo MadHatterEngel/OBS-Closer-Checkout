@@ -106,53 +106,37 @@ if st.session_state.verification_results is None:
             auto_submit = False
 
         if not auto_submit:
-            # Group into main and deep clean
-            main_tasks = [t for t in tasks_for_station if not t.get('day_of_week')]
-            deep_clean_tasks = [t for t in tasks_for_station if t.get('day_of_week')]
-
-            def render_task_cards(task_list, start_idx=0):
-                cols = st.columns(2)
-                for i, task_dict in enumerate(task_list):
-                    idx = start_idx + i
-                    task = task_dict['task']
-                    task_key = f"{station}_{task}"
-                    with cols[i % 2]:
-                        with st.container():
-                            display_task = f"**{task}**"
-                            if task_key in st.session_state.task_photos:
-                                st.success(f"✅ {display_task}")
-                                if task_dict.get('details'):
-                                    with st.expander("ℹ️ Details"):
-                                        st.write(task_dict['details'])
-                                if st.button("Retake", key=f"retake_btn_{task_key}_{idx}"):
-                                    del st.session_state.task_photos[task_key]
+            # Display current staged status compactly
+            cols = st.columns(2)
+            for idx, task_dict in enumerate(tasks_for_station):
+                task = task_dict['task']
+                task_key = f"{station}_{task}"
+                with cols[idx % 2]:
+                    with st.container():
+                        display_task = f"**{task}** (Daily)" if task_dict.get('day_of_week') else task
+                        if task_key in st.session_state.task_photos:
+                            st.success(f"✅ {display_task}")
+                            if task_dict.get('details'):
+                                with st.expander("ℹ️ Details:"):
+                                    st.write(task_dict['details'])
+                            if st.button("Retake", key=f"retake_btn_{task_key}_{idx}"):
+                                del st.session_state.task_photos[task_key]
+                                st.rerun()
+                        else:
+                            st.error(f"❌ {display_task}")
+                            if task_dict.get('details'):
+                                with st.expander("ℹ️ Details:"):
+                                    st.write(task_dict['details'])
+                            # Give option to take it right here if they don't want sequential
+                            img_data = native_camera(key=f"cam_{task_key}_{idx}")
+                            if img_data:
+                                if img_data != st.session_state.get(f"raw_cam_{task_key}"):
+                                    st.session_state[f"raw_cam_{task_key}"] = img_data
+                                    base64_str = img_data.split(',')[1]
+                                    st.session_state.task_photos[task_key] = base64.b64decode(base64_str)
                                     st.rerun()
-                            else:
-                                st.error(f"❌ {display_task}")
-                                if task_dict.get('details'):
-                                    with st.expander("ℹ️ Details"):
-                                        st.write(task_dict['details'])
-                                # Give option to take it right here if they don't want sequential
-                                img_data = native_camera(key=f"cam_{task_key}_{idx}")
-                                if img_data:
-                                    if img_data != st.session_state.get(f"raw_cam_{task_key}"):
-                                        st.session_state[f"raw_cam_{task_key}"] = img_data
-                                        base64_str = img_data.split(',')[1]
-                                        import base64
-                                        st.session_state.task_photos[task_key] = base64.b64decode(base64_str)
-                                        st.rerun()
-                    if (i + 1) % 2 == 0:
-                        st.write("")
-
-            st.markdown("#### Main Tasks")
-            if main_tasks:
-                render_task_cards(main_tasks, 0)
-            else:
-                st.info("No main tasks.")
-
-            if deep_clean_tasks:
-                with st.expander("🧼 Deep Clean Tasks (Daily)", expanded=False):
-                    render_task_cards(deep_clean_tasks, len(main_tasks))
+                if (idx + 1) % 2 == 0:
+                    st.write("")
 
         can_submit = len(missing_tasks) == 0
         btn_label = "Verify & Submit All" if can_submit else f"Capture {len(missing_tasks)} Remaining & Submit"
@@ -177,19 +161,8 @@ if st.session_state.verification_results is None:
                             ref_response = supabase.table('ai_references').select('task_key, photo_data, strictness').in_('task_key', task_keys).execute()
                             if ref_response.data:
                                 for row in ref_response.data:
-                                    import requests
-                                    img_val = row['photo_data']
-                                    baseline_bytes = None
-                                    if img_val and str(img_val).strip() not in ['', 'None'] and img_val.startswith('http'):
-                                        try:
-                                            resp = requests.get(img_val)
-                                            if resp.status_code == 200:
-                                                baseline_bytes = resp.content
-                                        except Exception:
-                                            pass
-
                                     references[row['task_key']] = {
-                                        'photo_data': baseline_bytes,
+                                        'photo_data': base64.b64decode(row['photo_data']),
                                         'strictness': row['strictness']
                                     }
                         except Exception as e:
@@ -221,68 +194,48 @@ else:
     results = st.session_state.verification_results
     all_passed = True
 
-    main_tasks = [t for t in tasks_for_station if not t.get('day_of_week')]
-    deep_clean_tasks = [t for t in tasks_for_station if t.get('day_of_week')]
+    for idx, task_dict in enumerate(tasks_for_station):
+        task = task_dict['task']
+        display_task = f"**{task}** (Daily)" if task_dict.get('day_of_week') else task
+        task_key = f"{station}_{task}"
+        res = results[task_key]
 
-    def render_results(task_list, start_idx=0):
-        nonlocal all_passed
-        for i, task_dict in enumerate(task_list):
-            idx = start_idx + i
-            task = task_dict['task']
-            display_task = f"**{task}**"
-            task_key = f"{station}_{task}"
-            res = results[task_key]
+        with st.container():
+            st.markdown(f"**{display_task}**")
+            if task_dict.get('details'):
+                with st.expander("ℹ️ Details:"):
+                    st.write(task_dict['details'])
 
-            with st.container():
-                st.markdown(f"**{display_task}**")
-                if task_dict.get('details'):
-                    with st.expander("ℹ️ Details"):
-                        st.write(task_dict['details'])
+            if res["status"] == "FAIL":
+                all_passed = False
+                st.error(f"❌ FAILED: {res['reason']}")
+                if res.get('feedback'):
+                    st.warning(f"🔍 AI Feedback: {res['feedback']}")
 
-                if res["status"] == "FAIL":
-                    all_passed = False
-                    st.error(f"❌ FAILED: {res['reason']}")
-                    if res.get('feedback'):
-                        st.warning(f"🔍 AI Feedback: {res['feedback']}")
+                img_data = native_camera(key=f"retake_cam_{task_key}_{idx}")
+                if img_data:
+                    if img_data != st.session_state.get(f"raw_cam_{task_key}"):
+                        st.session_state[f"raw_cam_{task_key}"] = img_data
+                        base64_str = img_data.split(',')[1]
+                        st.session_state.task_photos[task_key] = base64.b64decode(base64_str)
+                        st.session_state.verification_results[task_key] = {"status": "RETAKEN", "reason": "Photo updated. Waiting for re-verification."}
+                        st.rerun()
 
-                    from components.native_camera import native_camera
-                    img_data = native_camera(key=f"retake_cam_{task_key}_{idx}")
-                    if img_data:
-                        if img_data != st.session_state.get(f"raw_cam_{task_key}"):
-                            st.session_state[f"raw_cam_{task_key}"] = img_data
-                            base64_str = img_data.split(',')[1]
-                            import base64
-                            st.session_state.task_photos[task_key] = base64.b64decode(base64_str)
-                            st.session_state.verification_results[task_key] = {"status": "RETAKEN", "reason": "Photo updated. Waiting for re-verification."}
-                            st.rerun()
+            elif res["status"] == "RETAKEN":
+                all_passed = False
+                st.info("🔄 Photo updated. Ready for re-verification.")
+                img_data = native_camera(key=f"retake_cam2_{task_key}_{idx}")
+                if img_data:
+                    if img_data != st.session_state.get(f"raw_cam2_{task_key}"):
+                        st.session_state[f"raw_cam2_{task_key}"] = img_data
+                        base64_str = img_data.split(',')[1]
+                        st.session_state.task_photos[task_key] = base64.b64decode(base64_str)
+                        st.session_state.verification_results[task_key] = {"status": "RETAKEN", "reason": "Photo updated. Waiting for re-verification."}
+                        st.rerun()
+            else:
+                st.success(f"✅ PASSED: {res['reason']}")
 
-                elif res["status"] == "RETAKEN":
-                    all_passed = False
-                    st.info("🔄 Photo updated. Ready for re-verification.")
-                    from components.native_camera import native_camera
-                    img_data = native_camera(key=f"retake_cam2_{task_key}_{idx}")
-                    if img_data:
-                        if img_data != st.session_state.get(f"raw_cam2_{task_key}"):
-                            st.session_state[f"raw_cam2_{task_key}"] = img_data
-                            base64_str = img_data.split(',')[1]
-                            import base64
-                            st.session_state.task_photos[task_key] = base64.b64decode(base64_str)
-                            st.session_state.verification_results[task_key] = {"status": "RETAKEN", "reason": "Photo updated. Waiting for re-verification."}
-                            st.rerun()
-                else:
-                    st.success(f"✅ PASSED: {res['reason']}")
-
-            st.markdown("---")
-
-    st.markdown("#### Main Tasks")
-    if main_tasks:
-        render_results(main_tasks, 0)
-    else:
-        st.info("No main tasks.")
-
-    if deep_clean_tasks:
-        with st.expander("🧼 Deep Clean Tasks (Daily)", expanded=False):
-            render_results(deep_clean_tasks, len(main_tasks))
+        st.markdown("---")
 
     if not all_passed:
         if st.button("Re-Verify Pending Duties", type="primary", use_container_width=True):
@@ -294,19 +247,8 @@ else:
                         ref_response = supabase.table('ai_references').select('task_key, photo_data, strictness').in_('task_key', tasks_to_verify).execute()
                         if ref_response.data:
                             for row in ref_response.data:
-                                import requests
-                                img_val = row['photo_data']
-                                baseline_bytes = None
-                                if img_val and str(img_val).strip() not in ['', 'None'] and img_val.startswith('http'):
-                                    try:
-                                        resp = requests.get(img_val)
-                                        if resp.status_code == 200:
-                                            baseline_bytes = resp.content
-                                    except Exception:
-                                        pass
-
                                 references[row['task_key']] = {
-                                    'photo_data': baseline_bytes,
+                                    'photo_data': base64.b64decode(row['photo_data']),
                                     'strictness': row['strictness']
                                 }
                     except Exception as e:
@@ -359,6 +301,7 @@ else:
                             'employee_name': employee_name,
                             'station': f"{station} - {task}",
                             'image_url': public_url,
+                            'photo_data': None, # Deprecated the base64 column
                             'status': "APPROVED"
                         }).execute()
                     except Exception as e:

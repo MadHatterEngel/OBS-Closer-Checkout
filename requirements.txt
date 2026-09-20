@@ -4,4 +4,3 @@ Pillow
 plotly
 supabase
 google-genai
-requests
