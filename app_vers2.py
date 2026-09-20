@@ -78,7 +78,7 @@ if st.session_state.verification_results is None:
             display_task = f"**{task_dict['task']}** (Daily)" if task_dict.get('day_of_week') else task_dict['task']
             st.markdown(f"- {display_task}")
             if task_dict.get('details'):
-                st.caption(f"  *Restock: {task_dict['details']}*")
+                st.caption(f"  *Details: {task_dict['details']}*")
 
     st.markdown("### 2. Upload & Process")
 
