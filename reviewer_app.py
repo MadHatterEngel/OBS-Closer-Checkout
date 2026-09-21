@@ -119,48 +119,74 @@ with tab1:
             overall_status = checkout['status']
             tasks = checkout['tasks']
 
+            checkout_key = f"{timestamp}_{employee}_{station}"
+            view_key = f"view_all_imgs_{checkout_key}"
+            delete_confirm_key = f"confirm_delete_{checkout_key}"
+
             with st.expander(f"{timestamp} | {employee} — {station} ({len(tasks)} tasks verified)"):
 
-                # Create a dynamic 3-column grid
-                cols = st.columns(3)
+                col_btn1, col_btn2 = st.columns(2)
 
-                for idx, task in enumerate(tasks):
-                    col = cols[idx % 3] # Distribute evenly across the 3 columns
-                    with col:
-                        st.markdown(f"**{task['task_name']}**")
+                with col_btn1:
+                    is_viewing = st.session_state.get(view_key, False)
+                    btn_label = "Hide Photos" if is_viewing else "🖼️ View Photos"
+                    if st.button(btn_label, key=f"show_all_btn_{checkout_key}", use_container_width=True):
+                        st.session_state[view_key] = not is_viewing
+                        st.rerun()
 
-                        # Fixed URL validation logic
-                        image_url = task.get('image_url')
-                        valid_url = (
-                            image_url is not None and
-                            isinstance(image_url, str) and
-                            image_url.strip() and
-                            image_url.strip() != "None" and
-                            len(image_url.strip()) > 10
-                        )
+                with col_btn2:
+                    if st.button("🗑️ Delete Log", key=f"delete_log_btn_{checkout_key}", use_container_width=True):
+                        st.session_state[delete_confirm_key] = True
+                        st.rerun()
 
-                        if valid_url:
-                            # Implement lazy loading to prevent massive DOM slow-downs
-                            # Store a unique key for this image in session state
-                            view_key = f"view_img_{task['id']}"
+                if st.session_state.get(delete_confirm_key, False):
+                    st.warning("Are you sure you want to delete this entire log? This action cannot be undone.")
+                    col_conf1, col_conf2 = st.columns(2)
+                    with col_conf1:
+                        if st.button("Yes, Delete Log", type="primary", key=f"confirm_yes_{checkout_key}"):
+                            try:
+                                task_ids = [task['id'] for task in tasks]
+                                supabase.table('closing_logs').delete().in_('id', task_ids).execute()
+                                fetch_logs.clear()
+                                st.success("Log deleted successfully!")
+                                st.session_state[delete_confirm_key] = False
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Error deleting log: {str(e)}")
+                    with col_conf2:
+                        if st.button("Cancel", key=f"confirm_cancel_{checkout_key}"):
+                            st.session_state[delete_confirm_key] = False
+                            st.rerun()
 
-                            if st.session_state.get(view_key, False):
+                if st.session_state.get(view_key, False):
+                    st.markdown("---")
+                    # Create a dynamic 3-column grid
+                    cols = st.columns(3)
+
+                    for idx, task in enumerate(tasks):
+                        col = cols[idx % 3] # Distribute evenly across the 3 columns
+                        with col:
+                            st.markdown(f"**{task['task_name']}**")
+
+                            # Fixed URL validation logic
+                            image_url = task.get('image_url')
+                            valid_url = (
+                                image_url is not None and
+                                isinstance(image_url, str) and
+                                image_url.strip() and
+                                image_url.strip() != "None" and
+                                len(image_url.strip()) > 10
+                            )
+
+                            if valid_url:
                                 try:
                                     st.image(image_url, use_container_width=True)
-
-                                    if st.button("Hide Image", key=f"hide_btn_{task['id']}"):
-                                        st.session_state[view_key] = False
-                                        st.rerun()
                                 except Exception as e:
                                     st.error(f"Failed to load image URL: {str(e)}")
                                     st.caption(f"URL attempted: {image_url[:60]}...")
                             else:
-                                if st.button("🖼️ View Photo", key=f"show_btn_{task['id']}"):
-                                    st.session_state[view_key] = True
-                                    st.rerun()
-                        else:
-                            st.warning("No image data found.")
-                        st.markdown("---")
+                                st.warning("No image data found.")
+                            st.markdown("---")
 
     st.markdown("---")
     st.subheader("🛠️ Data Management")
