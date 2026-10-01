@@ -7,19 +7,13 @@ from google import genai
 import io
 from PIL import Image
 
-def validate_photo_with_ai(baseline_image_bytes, submission_photo_bytes, strictness_level):
+def validate_photo_with_ai(baseline_image_bytes, submission_photo_bytes, strictness_level, task_name="the task"):
     """
-    Compares a submission photo against a baseline using Gemini 3.6.
+    Evaluates a submission photo using Gemini 3.6.
+    If a baseline is provided, it compares the submission to the baseline.
+    If no baseline is provided, it evaluates if the task_name was completed based on the photo.
     Returns status ('PASS'/'FAIL') and reasoning.
     """
-    # If no baseline is provided, default to PASS per user request
-    if not baseline_image_bytes:
-        return {
-            "status": "PASS",
-            "confidence": 1.0,
-            "reason": "No baseline reference image assigned. Auto-passed."
-        }
-
     try:
         api_key = st.secrets.get("GEMINI_API_KEY")
         if not api_key:
@@ -31,8 +25,6 @@ def validate_photo_with_ai(baseline_image_bytes, submission_photo_bytes, strictn
 
         client = genai.Client(api_key=api_key)
 
-        # Prepare images for Gemini
-        img_baseline = Image.open(io.BytesIO(baseline_image_bytes))
         img_submission = Image.open(io.BytesIO(submission_photo_bytes))
 
         # Map strictness (1-10) to prompt instructions
@@ -41,27 +33,45 @@ def validate_photo_with_ai(baseline_image_bytes, submission_photo_bytes, strictn
         elif strictness_level <= 3:
             strictness_prompt = "You should be VERY LOOSE. Only FAIL the submission if the station is visibly trashed, very dirty, or obviously not cleaned at all. Ignore minor details."
         else:
-            strictness_prompt = "Use a NORMAL level of strictness. The station should look generally clean and comparable to the reference, but minor, negligible imperfections are okay."
+            strictness_prompt = "Use a NORMAL level of strictness. The station should look generally clean, but minor, negligible imperfections are okay."
 
-        prompt = f"""
-        You are a strict restaurant manager auditing a closing shift.
-        I am providing you with two images:
-        Image 1: The clean reference standard.
-        Image 2: The employee's submitted photo.
+        if baseline_image_bytes:
+            img_baseline = Image.open(io.BytesIO(baseline_image_bytes))
+            prompt = f"""
+            You are a strict restaurant manager auditing a closing shift.
+            I am providing you with two images:
+            Image 1: The clean reference standard for the task "{task_name}".
+            Image 2: The employee's submitted photo.
 
-        Your job is to compare Image 2 to Image 1 and determine if the employee cleaned the station properly.
+            Your job is to compare Image 2 to Image 1 and determine if the employee cleaned the station properly.
 
-        Strictness Level Instruction: {strictness_prompt}
+            Strictness Level Instruction: {strictness_prompt}
 
-        You must return your response in EXACTLY this format, with no markdown formatting or other words:
-        RESULT: PASS or FAIL
-        REASON: A one-sentence explanation of why it passed or failed.
-        FEEDBACK: If the result is FAIL, provide a highly specific, granular observation of exactly what is dirty or out of place (e.g., "There is a crumb on the left side of the cutting board"). If PASS, say "None".
-        """
+            You must return your response in EXACTLY this format, with no markdown formatting or other words:
+            RESULT: PASS or FAIL
+            REASON: A one-sentence explanation of why it passed or failed.
+            FEEDBACK: If the result is FAIL, provide a highly specific, granular observation of exactly what is dirty or out of place (e.g., "There is a crumb on the left side of the cutting board"). If PASS, say "None".
+            """
+            contents = [prompt, img_baseline, img_submission]
+        else:
+            prompt = f"""
+            You are a strict restaurant manager auditing a closing shift.
+            I am providing you with a photo submitted by an employee.
+
+            Your job is to look at the photo and determine if the task "{task_name}" was completed properly.
+
+            Strictness Level Instruction: {strictness_prompt}
+
+            You must return your response in EXACTLY this format, with no markdown formatting or other words:
+            RESULT: PASS or FAIL
+            REASON: A one-sentence explanation of why it passed or failed.
+            FEEDBACK: If the result is FAIL, provide a highly specific, granular observation of exactly what is dirty or out of place (e.g., "There is a crumb on the left side of the cutting board"). If PASS, say "None".
+            """
+            contents = [prompt, img_submission]
 
         # Use gemini-3.6-flash as it is fast and supports multimodal inputs
         chat = client.chats.create(model='gemini-3.6-flash')
-        response = chat.send_message([prompt, img_baseline, img_submission])
+        response = chat.send_message(contents)
         response_text = response.text.strip()
 
         # Parse response
