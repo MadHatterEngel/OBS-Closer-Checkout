@@ -233,8 +233,8 @@ else:
                     except Exception as e:
                         print(f"Failed to fetch references: {e}")
 
-                    def verify_single(t_key, p_bytes, b_bytes, strict):
-                        res = validate_photo_with_ai(b_bytes, p_bytes, strict)
+                    def verify_single(t_key, p_bytes, b_bytes, strict, task_name):
+                        res = validate_photo_with_ai(b_bytes, p_bytes, strict, task_name=task_name)
                         return t_key, res
 
                     with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -243,7 +243,8 @@ else:
                             p_bytes = st.session_state.task_photos[tk]
                             b_bytes = references.get(tk, {}).get('photo_data')
                             strict = references.get(tk, {}).get('strictness', 5)
-                            future = executor.submit(verify_single, tk, p_bytes, b_bytes, strict)
+                            task_name = tk.replace(f"{station}_", "", 1)
+                            future = executor.submit(verify_single, tk, p_bytes, b_bytes, strict, task_name)
                             future_to_task[future] = tk
 
                         for future in concurrent.futures.as_completed(future_to_task):
