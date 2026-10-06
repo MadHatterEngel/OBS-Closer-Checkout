@@ -20,6 +20,67 @@ try:
 except:
     pass
 
+@st.dialog("Configure AI Reference Standard")
+def ai_reference_dialog(task_key, current_strictness, ref_data):
+    st.markdown(f"**Task:** {task_key.split('_', 1)[1]}")
+    st.markdown("---")
+
+    # Uploader for new reference
+    new_image = st.file_uploader(f"Upload New Reference", type=["jpg", "jpeg", "png"], key=f"up_{task_key}")
+
+    # Strictness slider
+    new_strictness = st.slider(
+        "AI Strictness Level",
+        min_value=1, max_value=10, value=current_strictness,
+        help="1 = Very loose (passes almost anything), 10 = Very strict (must look exactly like reference)",
+        key=f"slider_{task_key}"
+    )
+
+    if st.button("Save AI Settings", type="primary", use_container_width=True):
+        update_data = {"strictness": new_strictness}
+
+        # Determine if we need to require an image
+        has_existing_image = ref_data and ref_data.get('photo_data')
+        if new_image is None and not has_existing_image:
+            st.error("You must upload an image to create a new reference.")
+            return
+
+        if new_image is not None:
+            # Process uploaded image
+            img_bytes = new_image.getvalue()
+
+            try:
+                # Upload to Supabase Storage
+                file_name = f"ref_{uuid.uuid4()}.jpg"
+                supabase.storage.from_('closing-photos').upload(
+                    file_name,
+                    img_bytes,
+                    {"content-type": "image/jpeg"}
+                )
+                # Get Public URL
+                public_url = supabase.storage.from_('closing-photos').get_public_url(file_name)
+                if not public_url or len(public_url.strip()) < 10:
+                    raise Exception("Failed to generate a valid public URL.")
+
+                update_data["photo_data"] = public_url
+            except Exception as upload_err:
+                st.error(f"Failed to upload image to storage: {upload_err}")
+                return
+
+        try:
+            if ref_data:
+                # Update existing
+                supabase.table('ai_references').update(update_data).eq('task_key', task_key).execute()
+            else:
+                # Insert new
+                update_data["task_key"] = task_key
+                supabase.table('ai_references').insert(update_data).execute()
+
+            st.success("Settings saved successfully!")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Failed to save settings: {e}")
+
 def check_password():
     def password_entered():
         manager_pass = st.secrets.get("MANAGER_PASSWORD", "manager123")
@@ -263,69 +324,16 @@ with tab2:
                     st.info("No reference image uploaded.")
 
             with col_settings:
-                with st.form(key=f"form_{ui_key}"):
-                    # Uploader for new reference
-                    new_image = st.file_uploader(f"Upload New Reference", type=["jpg", "jpeg", "png"], key=f"up_{ui_key}")
-
-                    # Strictness slider
-                    new_strictness = st.slider(
-                        "AI Strictness Level",
-                        min_value=1, max_value=10, value=current_strictness,
-                        help="1 = Very loose (passes almost anything), 10 = Very strict (must look exactly like reference)",
-                        key=f"slider_{ui_key}"
-                    )
-
-                    save_submitted = st.form_submit_button("Save AI Settings", type="primary")
-
-                if save_submitted:
-                    update_data = {"strictness": new_strictness}
-
-                    if new_image is not None:
-                        # Process uploaded image
-                        img_bytes = new_image.getvalue()
-
-                        try:
-                            # Upload to Supabase Storage
-                            file_name = f"ref_{uuid.uuid4()}.jpg"
-                            supabase.storage.from_('closing-photos').upload(
-                                file_name,
-                                img_bytes,
-                                {"content-type": "image/jpeg"}
-                            )
-                            # Get Public URL
-                            public_url = supabase.storage.from_('closing-photos').get_public_url(file_name)
-                            if not public_url or len(public_url.strip()) < 10:
-                                raise Exception("Failed to generate a valid public URL.")
-
-                            update_data["photo_data"] = public_url
-                        except Exception as upload_err:
-                            st.error(f"Failed to upload image to storage: {upload_err}")
-                            st.stop()
-
-                    try:
-                        if ref_data:
-                            # Update existing
-                            supabase.table('ai_references').update(update_data).eq('task_key', task_key).execute()
-                        else:
-                            # Insert new
-                            if "photo_data" not in update_data:
-                                st.error("You must upload an image to create a new reference.")
-                                st.stop()
-                            update_data["task_key"] = task_key
-                            supabase.table('ai_references').insert(update_data).execute()
-
-                        st.success("Settings saved successfully!")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Failed to save settings: {e}")
+                if st.button("⚙️ Configure AI Reference", use_container_width=True, key=f"btn_cfg_{ui_key}"):
+                    ai_reference_dialog(task_key, current_strictness, ref_data)
 
                 st.markdown("---")
-                test_image = st.file_uploader(f"Upload Test Image (Evaluates current slider value without saving)", type=["jpg", "jpeg", "png"], key=f"test_{ui_key}")
-                if st.button("🔬 Test AI Strictness", key=f"test_btn_{ui_key}"):
+                test_image = st.file_uploader(f"Upload Test Image", type=["jpg", "jpeg", "png"], key=f"test_{ui_key}")
+                if st.button("🔬 Test AI Strictness", key=f"test_btn_{ui_key}", use_container_width=True):
                     if test_image is not None:
-                        # Determine which baseline to use (the existing one, we can't test unsaved form data easily)
+                        # Determine which baseline to use
                         baseline_bytes = None
-                        if ref_data and ref_data['photo_data']:
+                        if ref_data and ref_data.get('photo_data'):
                             img_val = ref_data['photo_data']
                             if img_val and str(img_val).strip() not in ['', 'None'] and img_val.startswith('http'):
                                 import requests
@@ -337,15 +345,14 @@ with tab2:
                                     pass
 
                         if not baseline_bytes:
-                            st.warning("You must have a saved Reference image first before testing. (Upload and save one above).")
+                            st.warning("You must save a Reference image first before testing.")
                         else:
                             with st.spinner("Testing strictness..."):
-                                # Test against the current saved strictness (unless we want to read session state, but it's simpler to test what is saved or what is in the slider)
-                                ai_res = validate_photo_with_ai(baseline_bytes, test_image.getvalue(), st.session_state.get(f"slider_{ui_key}", current_strictness))
+                                ai_res = validate_photo_with_ai(baseline_bytes, test_image.getvalue(), current_strictness)
                             if ai_res['status'] == 'PASS':
-                                st.success(f"✅ PASSED at strictness {st.session_state.get(f'slider_{ui_key}', current_strictness)} ({ai_res['reason']})")
+                                st.success(f"✅ PASSED at strictness {current_strictness} ({ai_res['reason']})")
                             else:
-                                st.error(f"❌ FAILED at strictness {st.session_state.get(f'slider_{ui_key}', current_strictness)} ({ai_res['reason']})")
+                                st.error(f"❌ FAILED at strictness {current_strictness} ({ai_res['reason']})")
                                 if ai_res.get('feedback'):
                                     st.warning(f"🔍 AI Feedback: {ai_res['feedback']}")
                     else:
