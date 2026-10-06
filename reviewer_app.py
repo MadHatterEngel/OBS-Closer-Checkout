@@ -263,51 +263,21 @@ with tab2:
                     st.info("No reference image uploaded.")
 
             with col_settings:
-                # Uploader for new reference
-                new_image = st.file_uploader(f"Upload New Reference", type=["jpg", "jpeg", "png"], key=f"up_{ui_key}")
+                with st.form(key=f"form_{ui_key}"):
+                    # Uploader for new reference
+                    new_image = st.file_uploader(f"Upload New Reference", type=["jpg", "jpeg", "png"], key=f"up_{ui_key}")
 
-                # Strictness slider
-                new_strictness = st.slider(
-                    "AI Strictness Level",
-                    min_value=1, max_value=10, value=current_strictness,
-                    help="1 = Very loose (passes almost anything), 10 = Very strict (must look exactly like reference)",
-                    key=f"slider_{ui_key}"
-                )
+                    # Strictness slider
+                    new_strictness = st.slider(
+                        "AI Strictness Level",
+                        min_value=1, max_value=10, value=current_strictness,
+                        help="1 = Very loose (passes almost anything), 10 = Very strict (must look exactly like reference)",
+                        key=f"slider_{ui_key}"
+                    )
 
-                test_image = st.file_uploader(f"Upload Test Image (Evaluates current slider value without saving)", type=["jpg", "jpeg", "png"], key=f"test_{ui_key}")
-                if st.button("🔬 Test AI Strictness", key=f"test_btn_{ui_key}"):
-                    if test_image is not None:
-                        # Determine which baseline to use (the newly uploaded one, or the existing one)
-                        baseline_bytes = None
-                        if new_image is not None:
-                            baseline_bytes = new_image.getvalue()
-                        elif ref_data and ref_data['photo_data']:
-                            img_val = ref_data['photo_data']
-                            if img_val and str(img_val).strip() not in ['', 'None'] and img_val.startswith('http'):
-                                import requests
-                                try:
-                                    resp = requests.get(img_val)
-                                    if resp.status_code == 200:
-                                        baseline_bytes = resp.content
-                                except Exception:
-                                    pass
+                    save_submitted = st.form_submit_button("Save AI Settings", type="primary")
 
-                        if not baseline_bytes:
-                            st.warning("You must upload a Reference image first before testing. (Or wait for the current reference URL to load).")
-                        else:
-                            with st.spinner("Testing current strictness..."):
-                                ai_res = validate_photo_with_ai(baseline_bytes, test_image.getvalue(), new_strictness)
-                            if ai_res['status'] == 'PASS':
-                                st.success(f"✅ PASSED at strictness {new_strictness} ({ai_res['reason']})")
-                            else:
-                                st.error(f"❌ FAILED at strictness {new_strictness} ({ai_res['reason']})")
-                                if ai_res.get('feedback'):
-                                    st.warning(f"🔍 AI Feedback: {ai_res['feedback']}")
-                    else:
-                        st.warning("Upload a test image first.")
-
-                st.markdown("---")
-                if st.button("Save AI Settings", type="primary", key=f"save_{ui_key}"):
+                if save_submitted:
                     update_data = {"strictness": new_strictness}
 
                     if new_image is not None:
@@ -348,6 +318,38 @@ with tab2:
                         st.rerun()
                     except Exception as e:
                         st.error(f"Failed to save settings: {e}")
+
+                st.markdown("---")
+                test_image = st.file_uploader(f"Upload Test Image (Evaluates current slider value without saving)", type=["jpg", "jpeg", "png"], key=f"test_{ui_key}")
+                if st.button("🔬 Test AI Strictness", key=f"test_btn_{ui_key}"):
+                    if test_image is not None:
+                        # Determine which baseline to use (the existing one, we can't test unsaved form data easily)
+                        baseline_bytes = None
+                        if ref_data and ref_data['photo_data']:
+                            img_val = ref_data['photo_data']
+                            if img_val and str(img_val).strip() not in ['', 'None'] and img_val.startswith('http'):
+                                import requests
+                                try:
+                                    resp = requests.get(img_val)
+                                    if resp.status_code == 200:
+                                        baseline_bytes = resp.content
+                                except Exception:
+                                    pass
+
+                        if not baseline_bytes:
+                            st.warning("You must have a saved Reference image first before testing. (Upload and save one above).")
+                        else:
+                            with st.spinner("Testing strictness..."):
+                                # Test against the current saved strictness (unless we want to read session state, but it's simpler to test what is saved or what is in the slider)
+                                ai_res = validate_photo_with_ai(baseline_bytes, test_image.getvalue(), st.session_state.get(f"slider_{ui_key}", current_strictness))
+                            if ai_res['status'] == 'PASS':
+                                st.success(f"✅ PASSED at strictness {st.session_state.get(f'slider_{ui_key}', current_strictness)} ({ai_res['reason']})")
+                            else:
+                                st.error(f"❌ FAILED at strictness {st.session_state.get(f'slider_{ui_key}', current_strictness)} ({ai_res['reason']})")
+                                if ai_res.get('feedback'):
+                                    st.warning(f"🔍 AI Feedback: {ai_res['feedback']}")
+                    else:
+                        st.warning("Upload a test image first.")
 
 with tab3:
     st.subheader("⚙️ Station Requirements Management")
