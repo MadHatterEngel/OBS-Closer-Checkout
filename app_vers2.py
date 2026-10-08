@@ -20,6 +20,16 @@ try:
 except:
     pass
 
+
+@st.dialog("Upload Retake Photo")
+def upload_retake_modal(task_key):
+    st.write(f"Uploading new photo for: **{task_key.split('_', 1)[1]}**")
+    retake_file = st.file_uploader("Select new photo", type=["jpg", "jpeg", "png"], key=f"modal_upload_{task_key}")
+    if retake_file:
+        st.session_state.task_photos[task_key] = retake_file.getvalue()
+        st.session_state.verification_results[task_key] = {"status": "RETAKEN", "reason": "Photo updated. Waiting for re-verification."}
+        st.rerun()
+
 STATION_TASKS = fetch_station_tasks()
 
 st.markdown("## 🥩 Closing Protocol")
@@ -186,20 +196,14 @@ else:
                 if res.get('feedback'):
                     st.warning(f"🔍 AI Feedback: {res['feedback']}")
 
-                retake_file = st.file_uploader("Upload Retake", type=["jpg", "jpeg", "png"], key=f"retake_cam_{task_key}_{idx}")
-                if retake_file:
-                    st.session_state.task_photos[task_key] = retake_file.getvalue()
-                    st.session_state.verification_results[task_key] = {"status": "RETAKEN", "reason": "Photo updated. Waiting for re-verification."}
-                    st.rerun()
+                if st.button("📸 Upload Retake", key=f"retake_btn_{task_key}_{idx}"):
+                    upload_retake_modal(task_key)
 
             elif res["status"] == "RETAKEN":
                 all_passed = False
                 st.info("🔄 Photo updated. Ready for re-verification.")
-                retake_file = st.file_uploader("Upload Retake", type=["jpg", "jpeg", "png"], key=f"retake_cam2_{task_key}_{idx}")
-                if retake_file:
-                    st.session_state.task_photos[task_key] = retake_file.getvalue()
-                    st.session_state.verification_results[task_key] = {"status": "RETAKEN", "reason": "Photo updated. Waiting for re-verification."}
-                    st.rerun()
+                if st.button("📸 Upload Retake", key=f"retake_btn2_{task_key}_{idx}"):
+                    upload_retake_modal(task_key)
             else:
                 st.success(f"✅ PASSED: {res['reason']}")
 
