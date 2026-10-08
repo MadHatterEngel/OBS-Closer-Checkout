@@ -11,6 +11,39 @@ from ui_styling import apply_custom_css
 from ai_validator import validate_photo_with_ai
 
 
+
+@st.dialog("Test AI Strictness")
+def test_strictness_dialog(task_key, current_strictness, ref_data):
+    st.write(f"Testing strictness for: **{task_key.split('_', 1)[1]}** (Strictness: {current_strictness}/10)")
+    test_image = st.file_uploader("Upload Test Image", type=["jpg", "jpeg", "png"], key=f"modal_test_{task_key}")
+
+    if test_image and st.button("Run Test"):
+        # Determine which baseline to use
+        baseline_bytes = None
+        if ref_data and ref_data.get('photo_data'):
+            img_val = ref_data['photo_data']
+            if img_val and str(img_val).strip() not in ['', 'None'] and img_val.startswith('http'):
+                import requests
+                try:
+                    resp = requests.get(img_val)
+                    if resp.status_code == 200:
+                        baseline_bytes = resp.content
+                except Exception:
+                    pass
+
+        if not baseline_bytes:
+            st.warning("You must save a Reference image first before testing.")
+        else:
+            with st.spinner("Testing strictness..."):
+                from ai_validator import validate_photo_with_ai
+                ai_res = validate_photo_with_ai(baseline_bytes, test_image.getvalue(), current_strictness, task_key.split('_', 1)[1])
+            if ai_res['status'] == 'PASS':
+                st.success(f"✅ PASSED: {ai_res['reason']}")
+            else:
+                st.error(f"❌ FAILED: {ai_res['reason']}")
+                if ai_res.get('feedback'):
+                    st.warning(f"🔍 AI Feedback: {ai_res['feedback']}")
+
 apply_custom_css()
 
 try:
@@ -328,35 +361,8 @@ with tab2:
                     ai_reference_dialog(task_key, current_strictness, ref_data)
 
                 st.markdown("---")
-                test_image = st.file_uploader(f"Upload Test Image", type=["jpg", "jpeg", "png"], key=f"test_{ui_key}")
                 if st.button("🔬 Test AI Strictness", key=f"test_btn_{ui_key}", use_container_width=True):
-                    if test_image is not None:
-                        # Determine which baseline to use
-                        baseline_bytes = None
-                        if ref_data and ref_data.get('photo_data'):
-                            img_val = ref_data['photo_data']
-                            if img_val and str(img_val).strip() not in ['', 'None'] and img_val.startswith('http'):
-                                import requests
-                                try:
-                                    resp = requests.get(img_val)
-                                    if resp.status_code == 200:
-                                        baseline_bytes = resp.content
-                                except Exception:
-                                    pass
-
-                        if not baseline_bytes:
-                            st.warning("You must save a Reference image first before testing.")
-                        else:
-                            with st.spinner("Testing strictness..."):
-                                ai_res = validate_photo_with_ai(baseline_bytes, test_image.getvalue(), current_strictness)
-                            if ai_res['status'] == 'PASS':
-                                st.success(f"✅ PASSED at strictness {current_strictness} ({ai_res['reason']})")
-                            else:
-                                st.error(f"❌ FAILED at strictness {current_strictness} ({ai_res['reason']})")
-                                if ai_res.get('feedback'):
-                                    st.warning(f"🔍 AI Feedback: {ai_res['feedback']}")
-                    else:
-                        st.warning("Upload a test image first.")
+                    test_strictness_dialog(task_key, current_strictness, ref_data)
 
 with tab3:
     st.subheader("⚙️ Station Requirements Management")
