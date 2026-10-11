@@ -15,9 +15,22 @@ from ai_validator import validate_photo_with_ai
 @st.dialog("Test AI Strictness")
 def test_strictness_dialog(task_key, current_strictness, ref_data):
     st.write(f"Testing strictness for: **{task_key.split('_', 1)[1]}** (Strictness: {current_strictness}/10)")
-    test_image = st.file_uploader("Upload Test Image", type=["jpg", "jpeg", "png"], key=f"modal_test_{task_key}")
 
-    if test_image and st.button("Run Test"):
+    from components import bulk_uploader
+    import base64
+
+    test_image_b64_list = bulk_uploader(key=f"modal_test_{task_key}")
+
+    test_bytes = None
+    if test_image_b64_list and len(test_image_b64_list) > 0:
+        try:
+            clean_b64 = test_image_b64_list[0].split(",")[1] if "," in test_image_b64_list[0] else test_image_b64_list[0]
+            test_bytes = base64.b64decode(clean_b64)
+            st.success("Test photo loaded!")
+        except Exception as e:
+            st.error("Failed to process test photo.")
+
+    if test_bytes and st.button("Run Test"):
         # Determine which baseline to use
         baseline_bytes = None
         if ref_data and ref_data.get('photo_data'):
@@ -58,8 +71,22 @@ def ai_reference_dialog(task_key, current_strictness, ref_data):
     st.markdown(f"**Task:** {task_key.split('_', 1)[1]}")
     st.markdown("---")
 
+    from components import bulk_uploader
+    import base64
+    import uuid
+
     # Uploader for new reference
-    new_image = st.file_uploader(f"Upload New Reference", type=["jpg", "jpeg", "png"], key=f"up_{task_key}")
+    st.markdown("Upload New Reference Photo")
+    new_image_b64_list = bulk_uploader(key=f"up_{task_key}")
+
+    new_bytes = None
+    if new_image_b64_list and len(new_image_b64_list) > 0:
+        try:
+            clean_b64 = new_image_b64_list[0].split(",")[1] if "," in new_image_b64_list[0] else new_image_b64_list[0]
+            new_bytes = base64.b64decode(clean_b64)
+            st.success("Reference photo staged for saving!")
+        except Exception as e:
+            st.error("Failed to process reference photo.")
 
     # Strictness slider
     new_strictness = st.slider(
@@ -74,20 +101,17 @@ def ai_reference_dialog(task_key, current_strictness, ref_data):
 
         # Determine if we need to require an image
         has_existing_image = ref_data and ref_data.get('photo_data')
-        if new_image is None and not has_existing_image:
+        if new_bytes is None and not has_existing_image:
             st.error("You must upload an image to create a new reference.")
             return
 
-        if new_image is not None:
-            # Process uploaded image
-            img_bytes = new_image.getvalue()
-
+        if new_bytes is not None:
             try:
                 # Upload to Supabase Storage
                 file_name = f"ref_{uuid.uuid4()}.jpg"
                 supabase.storage.from_('closing-photos').upload(
                     file_name,
-                    img_bytes,
+                    new_bytes,
                     {"content-type": "image/jpeg"}
                 )
                 # Get Public URL
