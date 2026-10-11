@@ -70,25 +70,31 @@ def upload_retake_modal(task_key, task_name):
     """
     st.write(f"Uploading new photo for: **{task_name}**")
 
-    retake_file = st.file_uploader(
-        "Select new photo",
-        type=["jpg", "jpeg", "png"],
-        key=f"modal_upload_{task_key}",
-        help="Choose from your device photos"
-    )
+    with st.form(key=f"retake_form_{task_key}"):
+        retake_file = st.file_uploader(
+            "Select new photo",
+            type=["jpg", "jpeg", "png"],
+            key=f"modal_upload_{task_key}",
+            help="Choose from your device photos"
+        )
 
-    if retake_file:
-        try:
-            photo_bytes = retake_file.getvalue()
-            st.session_state.task_photos[task_key] = photo_bytes
-            st.session_state.verification_results[task_key] = {
-                "status": "RETAKEN",
-                "reason": "Photo updated. Waiting for re-verification."
-            }
-            st.success("✅ Photo saved. Click 'Close' and then 'Re-Verify Failed Tasks'.")
-            st.rerun()
-        except Exception as e:
-            st.error(f"Failed to save photo: {str(e)[:50]}...")
+        submit_btn = st.form_submit_button("Save Photo")
+
+        if submit_btn:
+            if retake_file:
+                try:
+                    photo_bytes = retake_file.getvalue()
+                    st.session_state.task_photos[task_key] = photo_bytes
+                    st.session_state.verification_results[task_key] = {
+                        "status": "RETAKEN",
+                        "reason": "Photo updated. Waiting for re-verification."
+                    }
+                    st.success("✅ Photo saved. You can close this dialog and then 'Re-Verify Failed Tasks'.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Failed to save photo: {str(e)[:50]}...")
+            else:
+                st.error("Please select a photo first.")
 
 
 STATION_TASKS = fetch_station_tasks()
