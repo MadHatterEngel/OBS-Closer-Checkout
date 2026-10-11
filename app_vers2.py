@@ -62,39 +62,6 @@ def fetch_reference_map(task_keys):
     return references
 
 
-@st.dialog("Upload Retake Photo")
-def upload_retake_modal(task_key, task_name):
-    """
-    Modal for uploading a retake photo.
-    Optimized for mobile with simple UI and instant feedback.
-    """
-    st.write(f"Uploading new photo for: **{task_name}**")
-
-    with st.form(key=f"retake_form_{task_key}"):
-        retake_file = st.file_uploader(
-            "Select new photo",
-            type=["jpg", "jpeg", "png"],
-            key=f"modal_upload_{task_key}",
-            help="Choose from your device photos"
-        )
-
-        submit_btn = st.form_submit_button("Save Photo")
-
-        if submit_btn:
-            if retake_file:
-                try:
-                    photo_bytes = retake_file.getvalue()
-                    st.session_state.task_photos[task_key] = photo_bytes
-                    st.session_state.verification_results[task_key] = {
-                        "status": "RETAKEN",
-                        "reason": "Photo updated. Waiting for re-verification."
-                    }
-                    st.success("✅ Photo saved. You can close this dialog and then 'Re-Verify Failed Tasks'.")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Failed to save photo: {str(e)[:50]}...")
-            else:
-                st.error("Please select a photo first.")
 
 
 STATION_TASKS = fetch_station_tasks()
@@ -120,6 +87,8 @@ if station != st.session_state.current_station:
     st.session_state.submission_complete = False
     st.session_state.submission_bytes_list = []
     st.session_state.last_uploader_val = None
+    st.session_state.retake_bytes_list = []
+    st.session_state.last_retake_uploader_val = None
     st.rerun()
 
 st.subheader(f"{station} Duties")
@@ -135,6 +104,10 @@ if "submission_bytes_list" not in st.session_state:
     st.session_state.submission_bytes_list = []
 if "last_uploader_val" not in st.session_state:
     st.session_state.last_uploader_val = None
+if "retake_bytes_list" not in st.session_state:
+    st.session_state.retake_bytes_list = []
+if "last_retake_uploader_val" not in st.session_state:
+    st.session_state.last_retake_uploader_val = None
 
 current_day = datetime.now().strftime("%A")
 raw_tasks = STATION_TASKS[station]
@@ -263,14 +236,9 @@ else:
                 if res.get("feedback"):
                     st.warning(f"🔍 AI Feedback: {res['feedback']}")
 
-                if st.button("📸 Upload Retake", key=f"retake_btn_{task_key}_{idx}"):
-                    upload_retake_modal(task_key, task)
-
             elif res["status"] == "RETAKEN":
                 all_passed = False
                 st.info("🔄 Photo updated. Ready for re-verification.")
-                if st.button("📸 Upload Different Photo", key=f"retake_btn2_{task_key}_{idx}"):
-                    upload_retake_modal(task_key, task)
 
             else:
                 st.success(f"✅ PASSED: {res['reason']}")
@@ -278,7 +246,48 @@ else:
         st.markdown("---")
 
     if not all_passed:
-        if st.button("Re-Verify Failed Tasks", type="primary", use_container_width=True):
+        st.markdown("### 📸 Snap Retakes")
+        st.info("Upload photos for any failed tasks above. Our AI will automatically figure out which photo belongs to which task.")
+
+        retake_compressed_b64 = bulk_uploader(key="retake_bulk_uploader")
+
+        if retake_compressed_b64 and retake_compressed_b64 != st.session_state.last_retake_uploader_val:
+            st.session_state.last_retake_uploader_val = retake_compressed_b64
+            new_retake_bytes = []
+            for b64_str in retake_compressed_b64:
+                try:
+                    clean_b64 = b64_str.split(",")[1] if "," in b64_str else b64_str
+                    new_retake_bytes.append(base64.b64decode(clean_b64))
+                except Exception:
+                    st.warning("⚠️ One retake photo failed to process. Skipping...")
+                    continue
+
+            st.session_state.retake_bytes_list.extend(new_retake_bytes)
+            st.rerun()
+
+        if st.session_state.retake_bytes_list:
+            st.success(f"✅ {len(st.session_state.retake_bytes_list)} retake photos ready")
+
+            with st.expander("🔍 Review & Edit Retakes", expanded=False):
+                idx_to_remove = None
+                cols = st.columns(5)
+
+                for idx, b_bytes in enumerate(st.session_state.retake_bytes_list):
+                    with cols[idx % 5]:
+                        st.image(b_bytes, use_container_width=True)
+                        if st.button("❌", key=f"remove_retake_{idx}", help="Remove", use_container_width=True):
+                            idx_to_remove = idx
+
+                if idx_to_remove is not None:
+                    st.session_state.retake_bytes_list.pop(idx_to_remove)
+                    st.rerun()
+
+        if st.button(
+            "Re-Verify Failed Tasks",
+            type="primary",
+            use_container_width=True,
+            disabled=not st.session_state.retake_bytes_list
+        ):
             with st.spinner("🤖 Re-checking updated photos..."):
                 try:
                     failed_tasks = []
@@ -294,24 +303,22 @@ else:
                     if failed_tasks:
                         references = fetch_reference_map([task_key_for(station, t["task"]) for t in failed_tasks])
 
-                        failed_photos = []
-                        for task_dict in failed_tasks:
-                            task_key = task_key_for(station, task_dict["task"])
-                            if task_key in st.session_state.task_photos:
-                                failed_photos.append(st.session_state.task_photos[task_key])
-
-                        if failed_photos:
+                        if st.session_state.retake_bytes_list:
                             results_subset, mapped_photos = validate_bulk_photos_with_ai(
                                 failed_tasks,
                                 station,
                                 references,
-                                failed_photos
+                                st.session_state.retake_bytes_list
                             )
 
                             for task_key, result in results_subset.items():
                                 st.session_state.verification_results[task_key] = result
 
                             st.session_state.task_photos.update(mapped_photos)
+
+                            # Clear retake queue after successful verification
+                            st.session_state.retake_bytes_list = []
+                            st.session_state.last_retake_uploader_val = None
 
                     st.rerun()
 
