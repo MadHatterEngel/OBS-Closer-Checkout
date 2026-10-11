@@ -5,6 +5,8 @@ import pandas as pd
 import io
 import base64
 import uuid
+from datetime import datetime, timedelta
+import pytz
 from PIL import Image
 from config import supabase, fetch_station_tasks
 from ui_styling import apply_custom_css
@@ -15,9 +17,22 @@ from ai_validator import validate_photo_with_ai
 @st.dialog("Test AI Strictness")
 def test_strictness_dialog(task_key, current_strictness, ref_data):
     st.write(f"Testing strictness for: **{task_key.split('_', 1)[1]}** (Strictness: {current_strictness}/10)")
-    test_image = st.file_uploader("Upload Test Image", type=["jpg", "jpeg", "png"], key=f"modal_test_{task_key}")
 
-    if test_image and st.button("Run Test"):
+    from components import bulk_uploader
+    import base64
+
+    test_image_b64_list = bulk_uploader(key=f"modal_test_{task_key}")
+
+    test_bytes = None
+    if test_image_b64_list and len(test_image_b64_list) > 0:
+        try:
+            clean_b64 = test_image_b64_list[0].split(",")[1] if "," in test_image_b64_list[0] else test_image_b64_list[0]
+            test_bytes = base64.b64decode(clean_b64)
+            st.success("Test photo loaded!")
+        except Exception as e:
+            st.error("Failed to process test photo.")
+
+    if test_bytes and st.button("Run Test"):
         # Determine which baseline to use
         baseline_bytes = None
         if ref_data and ref_data.get('photo_data'):
@@ -58,8 +73,22 @@ def ai_reference_dialog(task_key, current_strictness, ref_data):
     st.markdown(f"**Task:** {task_key.split('_', 1)[1]}")
     st.markdown("---")
 
+    from components import bulk_uploader
+    import base64
+    import uuid
+
     # Uploader for new reference
-    new_image = st.file_uploader(f"Upload New Reference", type=["jpg", "jpeg", "png"], key=f"up_{task_key}")
+    st.markdown("Upload New Reference Photo")
+    new_image_b64_list = bulk_uploader(key=f"up_{task_key}")
+
+    new_bytes = None
+    if new_image_b64_list and len(new_image_b64_list) > 0:
+        try:
+            clean_b64 = new_image_b64_list[0].split(",")[1] if "," in new_image_b64_list[0] else new_image_b64_list[0]
+            new_bytes = base64.b64decode(clean_b64)
+            st.success("Reference photo staged for saving!")
+        except Exception as e:
+            st.error("Failed to process reference photo.")
 
     # Strictness slider
     new_strictness = st.slider(
@@ -74,20 +103,17 @@ def ai_reference_dialog(task_key, current_strictness, ref_data):
 
         # Determine if we need to require an image
         has_existing_image = ref_data and ref_data.get('photo_data')
-        if new_image is None and not has_existing_image:
+        if new_bytes is None and not has_existing_image:
             st.error("You must upload an image to create a new reference.")
             return
 
-        if new_image is not None:
-            # Process uploaded image
-            img_bytes = new_image.getvalue()
-
+        if new_bytes is not None:
             try:
                 # Upload to Supabase Storage
                 file_name = f"ref_{uuid.uuid4()}.jpg"
                 supabase.storage.from_('closing-photos').upload(
                     file_name,
-                    img_bytes,
+                    new_bytes,
                     {"content-type": "image/jpeg"}
                 )
                 # Get Public URL
@@ -142,16 +168,43 @@ st.markdown("---")
 tab1, tab2, tab3 = st.tabs(["📋 Review Logs", "🤖 AI Verification Setup", "⚙️ Station Configuration"])
 
 with tab1:
-    def fetch_logs():
+    # Date Filter UI
+    col_filter, _ = st.columns([1, 3])
+    with col_filter:
+        date_filter = st.selectbox(
+            "Filter Logs By Date",
+            ["Today", "Yesterday", "Last 7 Days", "All Time"]
+        )
+
+    def fetch_logs(date_filter):
+        eastern = pytz.timezone('US/Eastern')
+        now_eastern = datetime.now(eastern)
+
         try:
+            query = supabase.table('closing_logs').select('id, timestamp, employee_name, station, image_url, status')
+
+            # Since timestamps are saved as strings like "2023-10-15 14:30:00" in Eastern Time natively
+            if date_filter == "Today":
+                start_date = now_eastern.strftime("%Y-%m-%d 00:00:00")
+                query = query.gte("timestamp", start_date)
+            elif date_filter == "Yesterday":
+                yesterday = now_eastern - timedelta(days=1)
+                start_date = yesterday.strftime("%Y-%m-%d 00:00:00")
+                end_date = yesterday.strftime("%Y-%m-%d 23:59:59")
+                query = query.gte("timestamp", start_date).lte("timestamp", end_date)
+            elif date_filter == "Last 7 Days":
+                last_week = now_eastern - timedelta(days=7)
+                start_date = last_week.strftime("%Y-%m-%d 00:00:00")
+                query = query.gte("timestamp", start_date)
+
             # Increased limit so a single multi-task checkout isn't cut off
-            response = supabase.table('closing_logs').select('id, timestamp, employee_name, station, image_url, status').order('id', desc=True).limit(250).execute()
+            response = query.order('id', desc=True).limit(250).execute()
             return response.data
         except Exception as e:
             st.error(f"Database error: {str(e)}")
             return []
 
-    logs = fetch_logs()
+    logs = fetch_logs(date_filter)
 
     # Group logs by checkout (timestamp, employee, base station)
     checkouts = {}

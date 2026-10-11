@@ -3,6 +3,7 @@ st.set_page_config(page_title="Outback Station Validator", page_icon="🥩", lay
 
 import base64
 from datetime import datetime
+import pytz
 import uuid
 from config import supabase, fetch_station_tasks
 from ai_validator import validate_bulk_photos_with_ai
@@ -109,7 +110,8 @@ if "retake_bytes_list" not in st.session_state:
 if "last_retake_uploader_val" not in st.session_state:
     st.session_state.last_retake_uploader_val = None
 
-current_day = datetime.now().strftime("%A")
+eastern = pytz.timezone('US/Eastern')
+current_day = datetime.now(eastern).strftime("%A")
 raw_tasks = STATION_TASKS[station]
 filtered_tasks = []
 daily_tasks = []
@@ -327,7 +329,8 @@ else:
 
     if all_passed:
         if not st.session_state.get("submission_complete", False):
-            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            eastern = pytz.timezone('US/Eastern')
+            current_time = datetime.now(eastern).strftime("%Y-%m-%d %H:%M:%S")
             with st.spinner("📤 Uploading final logs..."):
                 all_success = True
 
