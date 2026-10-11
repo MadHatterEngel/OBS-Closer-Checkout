@@ -110,7 +110,7 @@ def validate_bulk_photos_with_ai(tasks_list, station_name, references_dict, subm
     """
     Takes a list of tasks for a station and a raw list of uploaded photo bytes.
     Uses Gemini to holistically analyze all photos and figure out which photo
-    satisfies which task, grading them simultaneously.
+    satisfies which task, grading them simultaneously against reference images if provided.
     """
     if not submission_bytes_list:
         results = {}
@@ -125,6 +125,11 @@ def validate_bulk_photos_with_ai(tasks_list, station_name, references_dict, subm
         return results, {}
 
     try:
+        import streamlit as st
+        from google import genai
+        import io
+        from PIL import Image
+
         api_key = st.secrets.get("GEMINI_API_KEY")
         if not api_key:
             # Fake pass for local dev if no key
@@ -143,27 +148,74 @@ def validate_bulk_photos_with_ai(tasks_list, station_name, references_dict, subm
 
         client = genai.Client(api_key=api_key)
 
-        # Prepare all images for Gemini
+        # Prepare all submission images for Gemini
         submission_images = []
         for b in submission_bytes_list:
             submission_images.append(Image.open(io.BytesIO(b)))
 
-        # Build task descriptions
+        # Prepare reference images and build tasks text
+        contents = []
         tasks_text = "Here is the checklist of tasks that needed to be completed:\n"
+
+        has_references = False
+        ref_text_block = "Reference Standard Images:\n"
+
+        # We will keep a separate list of images to append to contents
+        reference_images = []
+        ref_counter = 1
+
+        # Overall strictness calculation
+        total_strictness = 0
+        strictness_count = 0
+
         for t in tasks_list:
-            tasks_text += f"- {t['task']}\n"
+            task_name = t['task']
+            task_key = f"{station_name}_{task_name}"
+
+            strictness = 5
+            ref_data = references_dict.get(task_key, {})
+            if isinstance(ref_data, dict):
+                strictness = ref_data.get('strictness', 5)
+                ref_bytes = ref_data.get('photo_data')
+            else:
+                ref_bytes = None
+
+            total_strictness += strictness
+            strictness_count += 1
+
+            tasks_text += f"- {task_name}\n"
+
+            if ref_bytes:
+                has_references = True
+                reference_images.append(Image.open(io.BytesIO(ref_bytes)))
+                ref_text_block += f"Image {len(submission_images) + ref_counter}: This is the clean reference standard for '{task_name}'.\n"
+                ref_counter += 1
+
+        avg_strictness = total_strictness / max(1, strictness_count)
+
+        if avg_strictness >= 8:
+            strictness_prompt = "You should be EXTREMELY STRICT. If there is even a single crumb, speck of grease, or minor difference in cleanliness compared to the reference, you must FAIL the submission."
+        elif avg_strictness <= 3:
+            strictness_prompt = "You should be VERY LOOSE. Only FAIL the submission if the station is visibly trashed, very dirty, or obviously not cleaned at all. Ignore minor details."
+        else:
+            strictness_prompt = "Use a NORMAL level of strictness. The station should look generally clean, but minor, negligible imperfections are okay."
+
 
         prompt = f"""
         You are a strict restaurant manager auditing a closing shift for the '{station_name}' station.
-        I am providing you with {len(submission_images)} photos taken by the employee of their completed station.
+        I am providing you with {len(submission_images)} photos taken by the employee of their completed station (Images 1 through {len(submission_images)}).
+
+        {ref_text_block if has_references else ""}
 
         {tasks_text}
 
-        Your job is to look at ALL the photos collectively and determine if EACH task on the checklist was completed properly.
-        Because these are bulk photos, you must figure out which photo(s) show the equipment/area for each task.
-        If a task requires cleaning a specific item, and that item is NOT visible in ANY of the photos, you must FAIL that task.
+        Your job is to look at ALL the employee's submitted photos collectively and determine if EACH task on the checklist was completed properly.
+        Because these are bulk photos, you must figure out which submitted photo(s) show the equipment/area for each task.
+        If a task requires cleaning a specific item, and that item is NOT visible in ANY of the submitted photos, you must FAIL that task.
 
-        Use a NORMAL level of strictness. The station should look generally clean, but minor, negligible imperfections are okay.
+        If a clean reference standard image is provided for a task, you MUST strictly compare the employee's submitted photo against that specific reference standard to determine if they cleaned it properly.
+
+        Strictness Level Instruction: {strictness_prompt}
 
         You must return your response in EXACTLY this format, with one block per task exactly matching the task name:
 
@@ -171,12 +223,13 @@ def validate_bulk_photos_with_ai(tasks_list, station_name, references_dict, subm
         RESULT: PASS or FAIL
         REASON: A one-sentence explanation of why it passed or failed.
         FEEDBACK: If the result is FAIL, provide a highly specific observation of what is dirty or missing. If PASS, say "None".
-        MATCHED_PHOTO_INDEX: The index (1 to {len(submission_images)}) of the photo that best proves this task. If none prove it, say 1.
+        MATCHED_PHOTO_INDEX: The index (1 to {len(submission_images)}) of the EMPLOYEE photo that best proves this task. If none prove it, say 1.
 
         (Repeat this block for every single task on the checklist).
         """
 
-        contents = [prompt] + submission_images
+        # Put prompt first, then submission images, then reference images
+        contents = [prompt] + submission_images + reference_images
 
         chat = client.chats.create(model='gemini-3.1-flash-lite')
         response = chat.send_message(contents)
