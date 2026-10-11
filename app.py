@@ -3,6 +3,7 @@ st.set_page_config(page_title="Outback Station Validator", page_icon="🥩", lay
 
 import base64
 from datetime import datetime
+import pytz
 import uuid
 import concurrent.futures
 from config import supabase, fetch_station_tasks
@@ -52,7 +53,8 @@ if 'submission_complete' not in st.session_state: st.session_state.submission_co
 if 'sequential_mode' not in st.session_state: st.session_state.sequential_mode = False
 if 'capture_queue' not in st.session_state: st.session_state.capture_queue = []
 
-current_day = datetime.now().strftime('%A')
+eastern = pytz.timezone('US/Eastern')
+current_day = datetime.now(eastern).strftime('%A')
 raw_tasks = STATION_TASKS[station]
 filtered_tasks = []
 daily_tasks = []
@@ -298,7 +300,8 @@ else:
 
     if all_passed:
         if not st.session_state.get('submission_complete', False):
-            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            eastern = pytz.timezone('US/Eastern')
+            current_time = datetime.now(eastern).strftime("%Y-%m-%d %H:%M:%S")
             with st.spinner("Submitting final logs..."):
                 all_success = True
                 for task_dict in tasks_for_station:
