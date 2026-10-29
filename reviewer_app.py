@@ -23,16 +23,20 @@ def test_strictness_dialog(task_key, current_strictness, ref_data):
 
     test_image_b64_list = bulk_uploader(key=f"modal_test_{task_key}")
 
-    test_bytes = None
+    test_bytes_list = []
     if test_image_b64_list and len(test_image_b64_list) > 0:
-        try:
-            clean_b64 = test_image_b64_list[0].split(",")[1] if "," in test_image_b64_list[0] else test_image_b64_list[0]
-            test_bytes = base64.b64decode(clean_b64)
-            st.success("Test photo loaded!")
-        except Exception as e:
-            st.error("Failed to process test photo.")
+        for b64 in test_image_b64_list:
+            try:
+                clean_b64 = b64.split(",")[1] if "," in b64 else b64
+                test_bytes_list.append(base64.b64decode(clean_b64))
+            except Exception as e:
+                pass
+        if test_bytes_list:
+            st.success(f"{len(test_bytes_list)} test photo(s) loaded!")
+        else:
+            st.error("Failed to process test photo(s).")
 
-    if test_bytes and st.button("Run Test"):
+    if test_bytes_list and st.button("Run Test"):
         # Determine which baseline to use
         baseline_bytes_list = []
         if ref_data and ref_data.get('photo_data'):
@@ -63,7 +67,7 @@ def test_strictness_dialog(task_key, current_strictness, ref_data):
         else:
             with st.spinner("Testing strictness..."):
                 from ai_validator import validate_photo_with_ai
-                ai_res = validate_photo_with_ai(baseline_bytes_list, test_bytes, current_strictness, task_key.split('_', 1)[1])
+                ai_res = validate_photo_with_ai(baseline_bytes_list, test_bytes_list, current_strictness, task_key.split('_', 1)[1])
             if ai_res['status'] == 'PASS':
                 st.success(f"✅ PASSED: {ai_res['reason']}")
             else:
