@@ -34,24 +34,36 @@ def test_strictness_dialog(task_key, current_strictness, ref_data):
 
     if test_bytes and st.button("Run Test"):
         # Determine which baseline to use
-        baseline_bytes = None
+        baseline_bytes_list = []
         if ref_data and ref_data.get('photo_data'):
             img_val = ref_data['photo_data']
-            if img_val and str(img_val).strip() not in ['', 'None'] and img_val.startswith('http'):
+            if img_val and str(img_val).strip() not in ['', 'None']:
+                import json
                 import requests
-                try:
-                    resp = requests.get(img_val)
-                    if resp.status_code == 200:
-                        baseline_bytes = resp.content
-                except Exception:
-                    pass
 
-        if not baseline_bytes:
-            st.warning("You must save a Reference image first before testing.")
+                urls_to_fetch = []
+                if str(img_val).startswith("["):
+                    try:
+                        urls_to_fetch = json.loads(img_val)
+                    except:
+                        pass
+                elif str(img_val).startswith("http"):
+                    urls_to_fetch = [img_val]
+
+                for url in urls_to_fetch:
+                    try:
+                        resp = requests.get(url, timeout=10)
+                        if resp.status_code == 200:
+                            baseline_bytes_list.append(resp.content)
+                    except Exception:
+                        pass
+
+        if not baseline_bytes_list:
+            st.warning("You must save at least one Reference image first before testing.")
         else:
             with st.spinner("Testing strictness..."):
                 from ai_validator import validate_photo_with_ai
-                ai_res = validate_photo_with_ai(baseline_bytes, test_image.getvalue(), current_strictness, task_key.split('_', 1)[1])
+                ai_res = validate_photo_with_ai(baseline_bytes_list, test_bytes, current_strictness, task_key.split('_', 1)[1])
             if ai_res['status'] == 'PASS':
                 st.success(f"✅ PASSED: {ai_res['reason']}")
             else:
@@ -76,19 +88,49 @@ def ai_reference_dialog(task_key, current_strictness, ref_data):
     from components import bulk_uploader
     import base64
     import uuid
+    import json
+
+    existing_urls = []
+    if ref_data and ref_data.get('photo_data'):
+        img_val = ref_data['photo_data']
+        if img_val and str(img_val).strip() not in ['', 'None']:
+            if str(img_val).startswith("["):
+                try:
+                    existing_urls = json.loads(img_val)
+                except:
+                    pass
+            elif str(img_val).startswith("http"):
+                existing_urls = [img_val]
+
+    # Initialize session state for urls if not present
+    state_key = f"ref_urls_{task_key}"
+    if state_key not in st.session_state:
+        st.session_state[state_key] = existing_urls
+
+    if st.session_state[state_key]:
+        st.markdown("**Existing Reference Photos**")
+        cols = st.columns(len(st.session_state[state_key]) if len(st.session_state[state_key]) > 0 else 1)
+        for idx, url in enumerate(st.session_state[state_key]):
+            with cols[idx % len(cols)]:
+                st.image(url, use_container_width=True)
+                if st.button("❌ Remove", key=f"rm_ref_{task_key}_{idx}", use_container_width=True):
+                    st.session_state[state_key].pop(idx)
+                    st.rerun()
 
     # Uploader for new reference
-    st.markdown("Upload New Reference Photo")
+    st.markdown("Upload New Reference Photos")
     new_image_b64_list = bulk_uploader(key=f"up_{task_key}")
 
-    new_bytes = None
+    new_bytes_list = []
     if new_image_b64_list and len(new_image_b64_list) > 0:
-        try:
-            clean_b64 = new_image_b64_list[0].split(",")[1] if "," in new_image_b64_list[0] else new_image_b64_list[0]
-            new_bytes = base64.b64decode(clean_b64)
-            st.success("Reference photo staged for saving!")
-        except Exception as e:
-            st.error("Failed to process reference photo.")
+        for b64 in new_image_b64_list:
+            try:
+                clean_b64 = b64.split(",")[1] if "," in b64 else b64
+                new_bytes_list.append(base64.b64decode(clean_b64))
+            except Exception as e:
+                st.error("Failed to process one or more reference photos.")
+        if new_bytes_list:
+            st.success(f"{len(new_bytes_list)} photo(s) staged for saving!")
 
     # Strictness slider
     new_strictness = st.slider(
@@ -102,29 +144,33 @@ def ai_reference_dialog(task_key, current_strictness, ref_data):
         update_data = {"strictness": new_strictness}
 
         # Determine if we need to require an image
-        has_existing_image = ref_data and ref_data.get('photo_data')
-        if new_bytes is None and not has_existing_image:
-            st.error("You must upload an image to create a new reference.")
+        if not new_bytes_list and not st.session_state[state_key]:
+            st.error("You must upload or keep at least one image to create/update a reference.")
             return
 
-        if new_bytes is not None:
-            try:
-                # Upload to Supabase Storage
-                file_name = f"ref_{uuid.uuid4()}.jpg"
-                supabase.storage.from_('closing-photos').upload(
-                    file_name,
-                    new_bytes,
-                    {"content-type": "image/jpeg"}
-                )
-                # Get Public URL
-                public_url = supabase.storage.from_('closing-photos').get_public_url(file_name)
-                if not public_url or len(public_url.strip()) < 10:
-                    raise Exception("Failed to generate a valid public URL.")
+        final_urls = list(st.session_state[state_key])
 
-                update_data["photo_data"] = public_url
+        if new_bytes_list:
+            try:
+                for img_bytes in new_bytes_list:
+                    # Upload to Supabase Storage
+                    file_name = f"ref_{uuid.uuid4()}.jpg"
+                    supabase.storage.from_('closing-photos').upload(
+                        file_name,
+                        img_bytes,
+                        {"content-type": "image/jpeg"}
+                    )
+                    # Get Public URL
+                    public_url = supabase.storage.from_('closing-photos').get_public_url(file_name)
+                    if not public_url or len(public_url.strip()) < 10:
+                        raise Exception("Failed to generate a valid public URL.")
+
+                    final_urls.append(public_url)
             except Exception as upload_err:
                 st.error(f"Failed to upload image to storage: {upload_err}")
                 return
+
+        update_data["photo_data"] = json.dumps(final_urls)
 
         try:
             if ref_data:
@@ -136,6 +182,7 @@ def ai_reference_dialog(task_key, current_strictness, ref_data):
                 supabase.table('ai_references').insert(update_data).execute()
 
             st.success("Settings saved successfully!")
+            st.session_state[state_key] = final_urls
             st.rerun()
         except Exception as e:
             st.error(f"Failed to save settings: {e}")
@@ -294,16 +341,27 @@ with tab1:
 
                             if st.session_state.get(view_key, False):
                                 try:
-                                    st.image(image_url, use_container_width=True)
+                                    import json
+                                    urls_to_show = []
+                                    if image_url.startswith("["):
+                                        try:
+                                            urls_to_show = json.loads(image_url)
+                                        except:
+                                            urls_to_show = []
+                                    else:
+                                        urls_to_show = [image_url]
 
-                                    if st.button("Hide Image", key=f"hide_btn_{task['id']}"):
+                                    for i, url in enumerate(urls_to_show):
+                                        st.image(url, use_container_width=True, caption=f"Photo {i+1}" if len(urls_to_show) > 1 else None)
+
+                                    if st.button("Hide Photo(s)", key=f"hide_btn_{task['id']}"):
                                         st.session_state[view_key] = False
                                         st.rerun()
                                 except Exception as e:
                                     st.error(f"Failed to load image URL: {str(e)}")
                                     st.caption(f"URL attempted: {image_url[:60]}...")
                             else:
-                                if st.button("🖼️ View Photo", key=f"show_btn_{task['id']}"):
+                                if st.button("🖼️ View Photo(s)", key=f"show_btn_{task['id']}"):
                                     st.session_state[view_key] = True
                                     st.rerun()
                         else:
@@ -398,16 +456,29 @@ with tab2:
             current_strictness = ref_data['strictness'] if ref_data else 5
 
             with col_img:
-                st.markdown("**Current Reference Image**")
+                st.markdown("**Current Reference Photos**")
                 if ref_data and ref_data['photo_data']:
-                    # We expect a Supabase Storage URL here
                     img_val = ref_data['photo_data']
-                    if img_val and str(img_val).strip() not in ['', 'None'] and img_val.startswith('http'):
-                        st.image(img_val, use_container_width=True)
+                    if img_val and str(img_val).strip() not in ['', 'None']:
+                        import json
+                        urls_to_show = []
+                        if str(img_val).startswith("["):
+                            try:
+                                urls_to_show = json.loads(img_val)
+                            except:
+                                urls_to_show = []
+                        elif str(img_val).startswith("http"):
+                            urls_to_show = [img_val]
+
+                        if urls_to_show:
+                            for i, url in enumerate(urls_to_show):
+                                st.image(url, use_container_width=True, caption=f"Reference {i+1}" if len(urls_to_show) > 1 else None)
+                        else:
+                            st.error("Invalid or legacy reference image format.")
                     else:
-                        st.error("Invalid or legacy reference image format.")
+                        st.info("No reference photos uploaded.")
                 else:
-                    st.info("No reference image uploaded.")
+                    st.info("No reference photos uploaded.")
 
             with col_settings:
                 if st.button("⚙️ Configure AI Reference", use_container_width=True, key=f"btn_cfg_{ui_key}"):
