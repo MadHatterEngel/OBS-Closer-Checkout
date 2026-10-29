@@ -7,7 +7,7 @@ from google import genai
 import io
 from PIL import Image
 
-def validate_photo_with_ai(baseline_image_bytes, submission_photo_bytes, strictness_level, task_name="the task"):
+def validate_photo_with_ai(baseline_image_bytes, submission_photo_bytes, strictness_level, task_name="the task", task_details=""):
     """
     Evaluates a submission photo using Gemini 3.6.
     If a baseline is provided, it compares the submission to the baseline.
@@ -40,6 +40,8 @@ def validate_photo_with_ai(baseline_image_bytes, submission_photo_bytes, strictn
         else:
             strictness_prompt = "Use a NORMAL level of strictness. The station should look generally clean, but minor, negligible imperfections are okay."
 
+        details_text = f"Task Details: {task_details}\n" if task_details else ""
+
         if baseline_image_bytes:
             if not isinstance(baseline_image_bytes, list):
                 baseline_image_bytes = [baseline_image_bytes]
@@ -51,7 +53,10 @@ def validate_photo_with_ai(baseline_image_bytes, submission_photo_bytes, strictn
             Image(s) 1 through {len(img_baselines)}: The clean reference standard(s) for the task "{task_name}". The submission photo MUST look exactly like these references to pass.
             Image(s) {len(img_baselines) + 1} through {len(img_baselines) + len(img_submissions)}: The employee's submitted photo(s).
 
+            {details_text}
+
             Your job is to strictly compare the employee's submitted photo(s) to the reference standard(s) and determine if the employee cleaned the station properly.
+            CRITICAL REFERENCE CHECK: The submitted photo(s) MUST clearly show the exact same workspace, equipment, or area depicted in the reference image(s). If the submitted photo shows a completely different area, or if it is impossible to verify that it is the same area shown in the reference, you MUST FAIL the submission.
             If multiple reference photos are provided, the employee's photo(s) should be compared against all aspects shown in the references.
             If multiple submission photos are provided, they collectively prove the task was completed. Do not just read the task name, look at what the reference image is actually showing you is supposed to be clean or completed.
 
@@ -60,7 +65,7 @@ def validate_photo_with_ai(baseline_image_bytes, submission_photo_bytes, strictn
             You must return your response in EXACTLY this format, with no markdown formatting or other words:
             RESULT: PASS or FAIL
             REASON: A one-sentence explanation of why it passed or failed.
-            FEEDBACK: If the result is FAIL, provide a highly specific, granular observation of exactly what is dirty or out of place (e.g., "There is a crumb on the left side of the cutting board"). If PASS, say "None".
+            FEEDBACK: If the result is FAIL, provide a highly specific, granular observation of exactly what is dirty or out of place (e.g., "There is a crumb on the left side of the cutting board"), or state if the submitted photo does not show the correct area. If PASS, say "None".
             """
             contents = [prompt] + img_baselines + img_submissions
         else:
@@ -69,6 +74,8 @@ def validate_photo_with_ai(baseline_image_bytes, submission_photo_bytes, strictn
             I am providing you with {len(img_submissions)} photo(s) submitted by an employee.
 
             Your job is to look at the photo(s) and determine if the task "{task_name}" was completed properly.
+
+            {details_text}
 
             Strictness Level Instruction: {strictness_prompt}
 
@@ -231,6 +238,7 @@ def validate_bulk_photos_with_ai(tasks_list, station_name, references_dict, subm
         If a task requires cleaning a specific item, and that item is NOT visible in ANY of the submitted photos, you must FAIL that task.
 
         If clean reference standard images are provided for a task, you MUST strictly compare the employee's submitted photos against ALL specific reference standards for that task to determine if they cleaned it properly. The submitted photos must satisfy the visual requirements of all references for that task, as well as any specific requirements in the 'Details' text for that task. Do not just read the task name, look at what the reference image is actually showing you is supposed to be clean or completed.
+        CRITICAL REFERENCE CHECK: When matching employee photos to a task with a reference standard, the employee photo(s) MUST clearly show the exact same workspace, equipment, or area depicted in the reference image(s). If no submitted photo clearly shows the same area as the reference, you MUST FAIL the task.
 
         Strictness Level Instruction: {strictness_prompt}
 
@@ -239,7 +247,7 @@ def validate_bulk_photos_with_ai(tasks_list, station_name, references_dict, subm
         TASK: [Exact Task Name]
         RESULT: PASS or FAIL
         REASON: A one-sentence explanation of why it passed or failed.
-        FEEDBACK: If the result is FAIL, provide a highly specific observation of what is dirty or missing. If PASS, say "None".
+        FEEDBACK: If the result is FAIL, provide a highly specific observation of what is dirty, missing, or if the submitted photos do not show the correct area. If PASS, say "None".
         MATCHED_PHOTO_INDEXES: A comma-separated list of the indexes (1 to {len(submission_images)}) of the EMPLOYEE photos that best prove this task. If none prove it, say 1.
 
         (Repeat this block for every single task on the checklist).
