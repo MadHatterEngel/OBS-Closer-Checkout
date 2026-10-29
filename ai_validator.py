@@ -48,12 +48,12 @@ def validate_photo_with_ai(baseline_image_bytes, submission_photo_bytes, strictn
             prompt = f"""
             You are a strict restaurant manager auditing a closing shift.
             I am providing you with {len(img_baselines) + len(img_submissions)} images:
-            Image(s) 1 through {len(img_baselines)}: The clean reference standard(s) for the task "{task_name}".
+            Image(s) 1 through {len(img_baselines)}: The clean reference standard(s) for the task "{task_name}". The submission photo MUST look exactly like these references to pass.
             Image(s) {len(img_baselines) + 1} through {len(img_baselines) + len(img_submissions)}: The employee's submitted photo(s).
 
-            Your job is to compare the employee's submitted photo(s) to the reference standard(s) and determine if the employee cleaned the station properly.
+            Your job is to strictly compare the employee's submitted photo(s) to the reference standard(s) and determine if the employee cleaned the station properly.
             If multiple reference photos are provided, the employee's photo(s) should be compared against all aspects shown in the references.
-            If multiple submission photos are provided, they collectively prove the task was completed.
+            If multiple submission photos are provided, they collectively prove the task was completed. Do not just read the task name, look at what the reference image is actually showing you is supposed to be clean or completed.
 
             Strictness Level Instruction: {strictness_prompt}
 
@@ -180,6 +180,7 @@ def validate_bulk_photos_with_ai(tasks_list, station_name, references_dict, subm
 
         for t in tasks_list:
             task_name = t['task']
+            task_details = t.get('details', '')
             task_key = f"{station_name}_{task_name}"
 
             strictness = 5
@@ -193,7 +194,10 @@ def validate_bulk_photos_with_ai(tasks_list, station_name, references_dict, subm
             total_strictness += strictness
             strictness_count += 1
 
-            tasks_text += f"- {task_name}\n"
+            task_description_with_details = f"- {task_name}"
+            if task_details:
+                task_description_with_details += f" (Details: {task_details})"
+            tasks_text += task_description_with_details + "\n"
 
             if ref_bytes_list:
                 if not isinstance(ref_bytes_list, list):
@@ -201,7 +205,7 @@ def validate_bulk_photos_with_ai(tasks_list, station_name, references_dict, subm
                 has_references = True
                 for rb in ref_bytes_list:
                     reference_images.append(Image.open(io.BytesIO(rb)))
-                    ref_text_block += f"Image {len(submission_images) + ref_counter}: This is a clean reference standard for '{task_name}'.\n"
+                    ref_text_block += f"Image {len(submission_images) + ref_counter}: This is a clean reference standard for '{task_name}'. The submission photo MUST look like this reference to pass.\n"
                     ref_counter += 1
 
         avg_strictness = total_strictness / max(1, strictness_count)
@@ -226,7 +230,7 @@ def validate_bulk_photos_with_ai(tasks_list, station_name, references_dict, subm
         Because these are bulk photos, you must figure out which submitted photo(s) show the equipment/area for each task.
         If a task requires cleaning a specific item, and that item is NOT visible in ANY of the submitted photos, you must FAIL that task.
 
-        If clean reference standard images are provided for a task, you MUST strictly compare the employee's submitted photos against ALL specific reference standards for that task to determine if they cleaned it properly. The submitted photos must satisfy the requirements of all references for that task.
+        If clean reference standard images are provided for a task, you MUST strictly compare the employee's submitted photos against ALL specific reference standards for that task to determine if they cleaned it properly. The submitted photos must satisfy the visual requirements of all references for that task, as well as any specific requirements in the 'Details' text for that task. Do not just read the task name, look at what the reference image is actually showing you is supposed to be clean or completed.
 
         Strictness Level Instruction: {strictness_prompt}
 
