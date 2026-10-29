@@ -15,7 +15,7 @@ from ai_validator import validate_photo_with_ai
 
 
 @st.dialog("Test AI Strictness")
-def test_strictness_dialog(task_key, current_strictness, ref_data):
+def test_strictness_dialog(task_key, current_strictness, ref_data, task_details=""):
     st.write(f"Testing strictness for: **{task_key.split('_', 1)[1]}** (Strictness: {current_strictness}/10)")
 
     from components import bulk_uploader
@@ -67,7 +67,7 @@ def test_strictness_dialog(task_key, current_strictness, ref_data):
         else:
             with st.spinner("Testing strictness..."):
                 from ai_validator import validate_photo_with_ai
-                ai_res = validate_photo_with_ai(baseline_bytes_list, test_bytes_list, current_strictness, task_key.split('_', 1)[1])
+                ai_res = validate_photo_with_ai(baseline_bytes_list, test_bytes_list, current_strictness, task_key.split('_', 1)[1], task_details=task_details)
             if ai_res['status'] == 'PASS':
                 st.success(f"✅ PASSED: {ai_res['reason']}")
             else:
@@ -490,7 +490,8 @@ with tab2:
 
                 st.markdown("---")
                 if st.button("🔬 Test AI Strictness", key=f"test_btn_{ui_key}", use_container_width=True):
-                    test_strictness_dialog(task_key, current_strictness, ref_data)
+                    task_details_text = next((t.get('details', '') for t in STATION_TASKS.get(station, []) if t['task'] == task_name), '')
+                    test_strictness_dialog(task_key, current_strictness, ref_data, task_details=task_details_text)
 
 with tab3:
     st.subheader("⚙️ Station Requirements Management")
