@@ -181,8 +181,8 @@ if st.session_state.verification_results is None:
                         except Exception as e:
                             print(f"Failed to fetch references: {e}")
 
-                        def verify_single(t_key, p_bytes, b_bytes, strict, task_name):
-                            res = validate_photo_with_ai(b_bytes, p_bytes, strict, task_name=task_name)
+                        def verify_single(t_key, p_bytes, b_bytes, strict, task_name, task_details):
+                            res = validate_photo_with_ai(b_bytes, p_bytes, strict, task_name=task_name, task_details=task_details)
                             return t_key, res
 
                         with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -192,7 +192,8 @@ if st.session_state.verification_results is None:
                                 b_bytes = references.get(tk, {}).get('photo_data')
                                 strict = references.get(tk, {}).get('strictness', 5)
                                 task_name = tk.replace(f"{station}_", "", 1)
-                                future = executor.submit(verify_single, tk, p_bytes, b_bytes, strict, task_name)
+                                task_details = next((t.get('details', '') for t in tasks_for_station if t['task'] == task_name), '')
+                                future = executor.submit(verify_single, tk, p_bytes, b_bytes, strict, task_name, task_details)
                                 future_to_task[future] = tk
 
                             for future in concurrent.futures.as_completed(future_to_task):
@@ -279,8 +280,8 @@ else:
                     except Exception as e:
                         print(f"Failed to fetch references: {e}")
 
-                    def verify_single(t_key, p_bytes, b_bytes, strict, task_name):
-                        res = validate_photo_with_ai(b_bytes, p_bytes, strict, task_name=task_name)
+                    def verify_single(t_key, p_bytes, b_bytes, strict, task_name, task_details):
+                        res = validate_photo_with_ai(b_bytes, p_bytes, strict, task_name=task_name, task_details=task_details)
                         return t_key, res
 
                     with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -290,7 +291,8 @@ else:
                             b_bytes = references.get(tk, {}).get('photo_data')
                             strict = references.get(tk, {}).get('strictness', 5)
                             task_name = tk.replace(f"{station}_", "", 1)
-                            future = executor.submit(verify_single, tk, p_bytes, b_bytes, strict, task_name)
+                            task_details = next((t.get('details', '') for t in tasks_for_station if t['task'] == task_name), '')
+                            future = executor.submit(verify_single, tk, p_bytes, b_bytes, strict, task_name, task_details)
                             future_to_task[future] = tk
 
                         for future in concurrent.futures.as_completed(future_to_task):
