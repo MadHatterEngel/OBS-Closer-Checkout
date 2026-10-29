@@ -40,21 +40,33 @@ def fetch_reference_map(task_keys):
         if ref_response.data:
             for row in ref_response.data:
                 import requests
+                import json
 
                 img_val = row.get("photo_data")
-                baseline_bytes = None
+                baseline_bytes_list = []
 
-                if img_val and str(img_val).strip() not in ["", "None"] and str(img_val).startswith("http"):
-                    try:
-                        # Mobile-friendly timeout
-                        resp = requests.get(img_val, timeout=10)
-                        if resp.status_code == 200:
-                            baseline_bytes = resp.content
-                    except Exception:
-                        pass
+                if img_val and str(img_val).strip() not in ["", "None"]:
+                    urls_to_fetch = []
+
+                    if str(img_val).startswith("["):
+                        try:
+                            urls_to_fetch = json.loads(img_val)
+                        except json.JSONDecodeError:
+                            urls_to_fetch = []
+                    elif str(img_val).startswith("http"):
+                        urls_to_fetch = [img_val]
+
+                    for url in urls_to_fetch:
+                        try:
+                            # Mobile-friendly timeout
+                            resp = requests.get(url, timeout=10)
+                            if resp.status_code == 200:
+                                baseline_bytes_list.append(resp.content)
+                        except Exception:
+                            pass
 
                 references[row["task_key"]] = {
-                    "photo_data": baseline_bytes,
+                    "photo_data": baseline_bytes_list,
                     "strictness": row.get("strictness", 5)
                 }
     except Exception as e:
@@ -332,38 +344,46 @@ else:
             eastern = pytz.timezone('US/Eastern')
             current_time = datetime.now(eastern).strftime("%Y-%m-%d %H:%M:%S")
             with st.spinner("📤 Uploading final logs..."):
+                import json
                 all_success = True
 
                 for task_dict in tasks_for_station:
                     task = task_dict["task"]
                     task_key = task_key_for(station, task)
-                    photo_bytes = st.session_state.task_photos.get(task_key)
+                    photo_bytes_list = st.session_state.task_photos.get(task_key)
 
-                    if photo_bytes is None:
-                        st.error(f"Missing photo for task: {task}")
+                    if not photo_bytes_list:
+                        st.error(f"Missing photo(s) for task: {task}")
                         all_success = False
                         break
 
+                    if not isinstance(photo_bytes_list, list):
+                        photo_bytes_list = [photo_bytes_list]
+
+                    public_urls = []
                     try:
-                        file_ext = "jpg"
-                        file_name = f"{current_time.replace(' ', '_').replace(':', '-')}_{uuid.uuid4().hex[:8]}.{file_ext}"
+                        for photo_bytes in photo_bytes_list:
+                            file_ext = "jpg"
+                            file_name = f"{current_time.replace(' ', '_').replace(':', '-')}_{uuid.uuid4().hex[:8]}.{file_ext}"
 
-                        supabase.storage.from_("closing-photos").upload(
-                            file_name,
-                            photo_bytes,
-                            {"content-type": "image/jpeg"}
-                        )
+                            supabase.storage.from_("closing-photos").upload(
+                                file_name,
+                                photo_bytes,
+                                {"content-type": "image/jpeg"}
+                            )
 
-                        public_url = supabase.storage.from_("closing-photos").get_public_url(file_name)
+                            public_url = supabase.storage.from_("closing-photos").get_public_url(file_name)
 
-                        if not public_url or not isinstance(public_url, str) or len(public_url.strip()) < 10:
-                            raise Exception("Invalid storage URL returned.")
+                            if not public_url or not isinstance(public_url, str) or len(public_url.strip()) < 10:
+                                raise Exception("Invalid storage URL returned.")
+
+                            public_urls.append(public_url)
 
                         supabase.table("closing_logs").insert({
                             "timestamp": current_time,
                             "employee_name": employee_name.strip(),
                             "station": f"{station} - {task}",
-                            "image_url": public_url,
+                            "image_url": json.dumps(public_urls),
                             "status": "APPROVED"
                         }).execute()
 
