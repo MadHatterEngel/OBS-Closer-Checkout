@@ -499,39 +499,6 @@ with tab3:
 
     st.markdown("Modify, add, or remove check-out stations and their specific tasks. Changes instantly reflect on the closer application.")
 
-    col_restore, col_empty = st.columns([1, 3])
-    with col_restore:
-        if st.button("🔄 Restore Default Tasks", use_container_width=True):
-            try:
-                import json
-                with open("default_tasks.json", "r") as f:
-                    default_data = json.load(f)
-
-                # First delete all existing to avoid duplicates if they click it multiple times
-                supabase.table('station_tasks').delete().neq('id', 0).execute()
-
-                insert_list = []
-                for station_name, tasks_list in default_data.items():
-                    for task_dict in tasks_list:
-                        insert_dict = {
-                            "station": station_name,
-                            "task": task_dict["task"],
-                            "day_of_week": task_dict.get("day_of_week"),
-                            "details": task_dict.get("details")
-                        }
-                        insert_list.append(insert_dict)
-
-                # Insert in chunks of 50 to avoid any potential Supabase request size limits
-                for i in range(0, len(insert_list), 50):
-                    chunk = insert_list[i:i+50]
-                    supabase.table('station_tasks').insert(chunk).execute()
-
-                fetch_station_tasks.clear()
-                st.success("Successfully restored default tasks to database!")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Failed to restore default tasks: {e}")
-
     # Reload fresh station tasks
     station_tasks = fetch_station_tasks()
 
@@ -684,3 +651,46 @@ with tab3:
                     st.error(f"Error creating station: {e}")
             else:
                 st.warning("Both Station Name and Initial Task are required to create a new station.")
+
+    st.markdown("---")
+    st.markdown("### 🔄 Restore Default Tasks")
+    st.warning("This will erase all current custom stations and tasks, and restore the original defaults.")
+
+    with st.form(key="restore_defaults_form"):
+        restore_pass_input = st.text_input("Enter Manager Access Code to confirm", type="password")
+        submit_restore = st.form_submit_button("Restore Default Tasks")
+
+        if submit_restore:
+            manager_pass = st.secrets.get("MANAGER_PASSWORD", "manager123")
+            if restore_pass_input == manager_pass:
+                try:
+                    import json
+                    with open("default_tasks.json", "r") as f:
+                        default_data = json.load(f)
+
+                    # First delete all existing to avoid duplicates if they click it multiple times
+                    supabase.table('station_tasks').delete().neq('id', 0).execute()
+
+                    insert_list = []
+                    for station_name, tasks_list in default_data.items():
+                        for task_dict in tasks_list:
+                            insert_dict = {
+                                "station": station_name,
+                                "task": task_dict["task"],
+                                "day_of_week": task_dict.get("day_of_week"),
+                                "details": task_dict.get("details")
+                            }
+                            insert_list.append(insert_dict)
+
+                    # Insert in chunks of 50 to avoid any potential Supabase request size limits
+                    for i in range(0, len(insert_list), 50):
+                        chunk = insert_list[i:i+50]
+                        supabase.table('station_tasks').insert(chunk).execute()
+
+                    fetch_station_tasks.clear()
+                    st.success("Successfully restored default tasks to database!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Failed to restore default tasks: {e}")
+            else:
+                st.error("Incorrect manager access code.")
