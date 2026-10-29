@@ -490,7 +490,7 @@ with tab2:
 
                 st.markdown("---")
                 if st.button("🔬 Test AI Strictness", key=f"test_btn_{ui_key}", use_container_width=True):
-                    task_details_text = next((t.get('details', '') for t in STATION_TASKS.get(station, []) if t['task'] == task_name), '')
+                    task_details_text = next((t.get('details', '') for t in station_tasks.get(station, []) if t['task'] == task_name), '')
                     test_strictness_dialog(task_key, current_strictness, ref_data, task_details=task_details_text)
 
 with tab3:
