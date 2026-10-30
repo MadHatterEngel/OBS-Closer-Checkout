@@ -41,6 +41,10 @@ def validate_photo_with_ai(baseline_image_bytes, submission_photo_bytes, strictn
             strictness_prompt = "Use a NORMAL level of strictness. The station should look generally clean, but minor, negligible imperfections are okay."
 
         details_text = f"Task Details: {task_details}\n" if task_details else ""
+        from datetime import datetime
+        import pytz
+        eastern = pytz.timezone('US/Eastern')
+        current_date = datetime.now(eastern).strftime("%B %d, %Y")
 
         if baseline_image_bytes:
             if not isinstance(baseline_image_bytes, list):
@@ -48,7 +52,7 @@ def validate_photo_with_ai(baseline_image_bytes, submission_photo_bytes, strictn
 
             img_baselines = [Image.open(io.BytesIO(b)) for b in baseline_image_bytes]
             prompt = f"""
-            You are a strict restaurant manager auditing a closing shift.
+            You are a strict restaurant manager auditing a closing shift. Today's date is {current_date}. If you are evaluating expiration dates or food labels, use this date to determine if a product is expired.
             I am providing you with {len(img_baselines) + len(img_submissions)} images:
             Image(s) 1 through {len(img_baselines)}: The clean reference standard(s) for the task "{task_name}". The submission photo MUST look exactly like these references to pass.
             Image(s) {len(img_baselines) + 1} through {len(img_baselines) + len(img_submissions)}: The employee's submitted photo(s).
@@ -70,7 +74,7 @@ def validate_photo_with_ai(baseline_image_bytes, submission_photo_bytes, strictn
             contents = [prompt] + img_baselines + img_submissions
         else:
             prompt = f"""
-            You are a strict restaurant manager auditing a closing shift.
+            You are a strict restaurant manager auditing a closing shift. Today's date is {current_date}. If you are evaluating expiration dates or food labels, use this date to determine if a product is expired.
             I am providing you with {len(img_submissions)} photo(s) submitted by an employee.
 
             Your job is to look at the photo(s) and determine if the task "{task_name}" was completed properly.
@@ -225,8 +229,13 @@ def validate_bulk_photos_with_ai(tasks_list, station_name, references_dict, subm
             strictness_prompt = "Use a NORMAL level of strictness. The station should look generally clean, but minor, negligible imperfections are okay."
 
 
+        from datetime import datetime
+        import pytz
+        eastern = pytz.timezone('US/Eastern')
+        current_date = datetime.now(eastern).strftime("%B %d, %Y")
+
         prompt = f"""
-        You are a strict restaurant manager auditing a closing shift for the '{station_name}' station.
+        You are a strict restaurant manager auditing a closing shift for the '{station_name}' station. Today's date is {current_date}. If you are evaluating expiration dates or food labels, use this date to determine if a product is expired.
         I am providing you with {len(submission_images)} photos taken by the employee of their completed station (Images 1 through {len(submission_images)}).
 
         {ref_text_block if has_references else ""}
