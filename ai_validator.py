@@ -1,8 +1,16 @@
 """
 AI Photo Standard Auditor Module
 Evaluates submission photos against clean baseline standards using Google Gemini.
+
+
+
+
+
+
 """
 import streamlit as st
+from datetime import datetime
+import pytz
 from google import genai
 import io
 from PIL import Image
@@ -41,8 +49,6 @@ def validate_photo_with_ai(baseline_image_bytes, submission_photo_bytes, strictn
             strictness_prompt = "Use a NORMAL level of strictness. The station should look generally clean, but minor, negligible imperfections are okay."
 
         details_text = f"Task Details: {task_details}\n" if task_details else ""
-        from datetime import datetime
-        import pytz
         eastern = pytz.timezone('US/Eastern')
         current_date = datetime.now(eastern).strftime("%B %d, %Y")
 
@@ -229,8 +235,6 @@ def validate_bulk_photos_with_ai(tasks_list, station_name, references_dict, subm
             strictness_prompt = "Use a NORMAL level of strictness. The station should look generally clean, but minor, negligible imperfections are okay."
 
 
-        from datetime import datetime
-        import pytz
         eastern = pytz.timezone('US/Eastern')
         current_date = datetime.now(eastern).strftime("%B %d, %Y")
 
