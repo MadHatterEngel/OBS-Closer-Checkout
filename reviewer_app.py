@@ -320,14 +320,27 @@ with tab1:
 
             with st.expander(f"{timestamp} | {employee} — {station} ({len(tasks)} tasks verified)"):
 
-                # Create a dynamic 3-column grid
-                cols = st.columns(3)
+                checkout_view_key = f"view_img_checkout_{key}"
+                is_viewing = st.session_state.get(checkout_view_key, False)
 
-                for idx, task in enumerate(tasks):
-                    col = cols[idx % 3] # Distribute evenly across the 3 columns
-                    with col:
-                        st.markdown(f"**{task['task_name']}**")
+                col_btn, _ = st.columns([1, 4])
+                with col_btn:
+                    if is_viewing:
+                        if st.button("Hide Photos", key=f"hide_btn_{key}", use_container_width=True):
+                            st.session_state[checkout_view_key] = False
+                            st.rerun()
+                    else:
+                        if st.button("🖼️ View Photos", key=f"show_btn_{key}", use_container_width=True):
+                            st.session_state[checkout_view_key] = True
+                            st.rerun()
 
+                if is_viewing:
+                    st.markdown("---")
+                    # Create a dynamic 3-column grid
+                    cols = st.columns(3)
+
+                    grid_idx = 0
+                    for task in tasks:
                         # Fixed URL validation logic
                         image_url = task.get('image_url')
                         valid_url = (
@@ -339,11 +352,9 @@ with tab1:
                         )
 
                         if valid_url:
-                            # Implement lazy loading to prevent massive DOM slow-downs
-                            # Store a unique key for this image in session state
-                            view_key = f"view_img_{task['id']}"
-
-                            if st.session_state.get(view_key, False):
+                            col = cols[grid_idx % 3]
+                            with col:
+                                st.markdown(f"**{task['task_name']}**")
                                 try:
                                     import json
                                     urls_to_show = []
@@ -358,19 +369,16 @@ with tab1:
                                     for i, url in enumerate(urls_to_show):
                                         st.image(url, use_container_width=True, caption=f"Photo {i+1}" if len(urls_to_show) > 1 else None)
 
-                                    if st.button("Hide Photo(s)", key=f"hide_btn_{task['id']}"):
-                                        st.session_state[view_key] = False
-                                        st.rerun()
                                 except Exception as e:
                                     st.error(f"Failed to load image URL: {str(e)}")
                                     st.caption(f"URL attempted: {image_url[:60]}...")
-                            else:
-                                if st.button("🖼️ View Photo(s)", key=f"show_btn_{task['id']}"):
-                                    st.session_state[view_key] = True
-                                    st.rerun()
-                        else:
-                            st.warning("No image data found.")
-                        st.markdown("---")
+                                st.markdown("---")
+                            grid_idx += 1
+                else:
+                    # Just show task list if photos are hidden
+                    st.markdown("---")
+                    for task in tasks:
+                        st.markdown(f"- {task['task_name']}")
 
     st.markdown("---")
     st.subheader("🛠️ Data Management")
@@ -522,7 +530,7 @@ with tab3:
                         current_day = task_dict.get('day_of_week', "None")
                         day_options = ["None", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
                         edit_day = st.selectbox("Assign to specific Day (Optional)", day_options, index=day_options.index(current_day) if current_day in day_options else 0, key=f"edit_day_{task_id}")
-                        edit_details = st.text_area("Task Details / Restock Chart (Optional)", value=task_dict.get('details', ''), key=f"edit_det_{task_id}")
+                        edit_details = st.text_area("Task Details (Optional)", value=task_dict.get('details', ''), key=f"edit_det_{task_id}")
 
                         col_save, col_cancel = st.columns(2)
                         with col_save:
@@ -583,7 +591,7 @@ with tab3:
             with st.form(key=f"add_task_form_{station}"):
                 new_task_desc = st.text_input("New Task Description", placeholder="e.g., Sanitize countertops")
                 new_day = st.selectbox("Assign to specific Day (Optional)", ["None", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"], key=f"day_{station}")
-                new_details = st.text_area("Task Details / Restock Chart (Optional)", placeholder="List items here...")
+                new_details = st.text_area("Task Details (Optional)", placeholder="List items here...")
                 submit_new_task = st.form_submit_button("➕ Add Task")
 
                 if submit_new_task:

@@ -146,15 +146,21 @@ if st.session_state.verification_results is None:
     st.info("📸 Use your phone's native camera to snap photos. Upload them all at once below.")
 
     with st.expander("📋 View Station Checklist", expanded=False):
-        for task_dict in tasks_for_station:
-            # We want to format this with (Monday Deep Clean) if they have a day of week
-            if task_dict.get('day_of_week'):
-                display_task = f"**{task_dict['task']}** ({task_dict['day_of_week']} Deep Clean)"
-            else:
-                display_task = f"**{task_dict['task']}**"
+        st.markdown("**Main Tasks**")
+        for task_dict in filtered_tasks:
+            display_task = f"**{task_dict['task']}**"
             st.markdown(f"- {display_task}")
             if task_dict.get("details"):
                 st.caption(f"  *Details: {task_dict['details']}*")
+
+        if daily_tasks:
+            st.markdown("---")
+            st.markdown("**Deep Clean Tasks**")
+            for task_dict in daily_tasks:
+                display_task = f"**{task_dict['task']}** ({task_dict['day_of_week']} Deep Clean)"
+                st.markdown(f"- {display_task}")
+                if task_dict.get("details"):
+                    st.caption(f"  *Details: {task_dict['details']}*")
 
     st.markdown("### 2. Upload & Process")
 
