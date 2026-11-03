@@ -83,7 +83,7 @@ def validate_photo_with_ai(baseline_image_bytes, submission_photo_bytes, strictn
             You are a strict restaurant manager auditing a closing shift. Today's date is {current_date}. If you are evaluating expiration dates or food labels, use this date to determine if a product is expired. IMPORTANT: If a label shows a date that is equal to or AFTER {current_date}, it is NOT expired and you must NOT fail it for being expired.
             I am providing you with {len(img_submissions)} photo(s) submitted by an employee.
 
-            Your job is to look at the photo(s) and determine if the task "{task_name}" was completed properly.
+            Your job is to look at the photo(s) and determine if the task "{task_name}" was completed properly. Because there is no reference standard image provided, you must use your best judgment based on the task name, task details, and regular logic to determine if the task is complete. (For example, if the task is to clean a floor, and there is a mop bucket left in the middle of the floor, or visible debris, you should fail it).
 
             {details_text}
 
@@ -252,6 +252,7 @@ def validate_bulk_photos_with_ai(tasks_list, station_name, references_dict, subm
 
         If clean reference standard images are provided for a task, you MUST strictly compare the employee's submitted photos against ALL specific reference standards for that task to determine if they cleaned it properly. The submitted photos must satisfy the visual requirements of all references for that task, as well as any specific requirements in the 'Details' text for that task. Do not just read the task name, look at what the reference image is actually showing you is supposed to be clean or completed.
         CRITICAL REFERENCE CHECK: When matching employee photos to a task with a reference standard, the employee photo(s) MUST clearly show the exact same workspace, equipment, or area depicted in the reference image(s). If no submitted photo clearly shows the same area as the reference, you MUST FAIL the task.
+        If a task does NOT have a reference standard image, you must use your best judgment based on the task name, task details, and regular logic to determine if the task is complete. (For example, if the task is to clean a floor, and there is a mop bucket left in the middle of the floor, or visible debris, you should fail it).
 
         Strictness Level Instruction: {strictness_prompt}
 

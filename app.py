@@ -147,10 +147,11 @@ if st.session_state.verification_results is None:
                 st.markdown("---")
                 with st.expander("Deep Clean Tasks", expanded=True):
                     cols_dc = st.columns(2)
+                    idx_counter_dc = 0
                     for task_dict in daily_tasks:
                         task = task_dict['task']
                         task_key = f"{station}_{task}"
-                        with cols_dc[idx_counter % 2]:
+                        with cols_dc[idx_counter_dc % 2]:
                             with st.container():
                                 display_task = f"**{task}** ({task_dict['day_of_week']} Deep Clean)"
                                 if task_key in st.session_state.task_photos:
@@ -158,7 +159,7 @@ if st.session_state.verification_results is None:
                                     if task_dict.get('details'):
                                         with st.expander("ℹ️ Details"):
                                             st.write(task_dict['details'])
-                                    if st.button("Retake", key=f"retake_btn_{task_key}_{idx_counter}"):
+                                    if st.button("Retake", key=f"retake_btn_{task_key}_{idx_counter_dc}_dc"):
                                         del st.session_state.task_photos[task_key]
                                         st.rerun()
                                 else:
@@ -167,15 +168,15 @@ if st.session_state.verification_results is None:
                                         with st.expander("ℹ️ Details"):
                                             st.write(task_dict['details'])
                                     # Give option to take it right here if they don't want sequential
-                                    img_data = native_camera(key=f"cam_{task_key}_{idx_counter}")
+                                    img_data = native_camera(key=f"cam_{task_key}_{idx_counter_dc}_dc")
                                     if img_data:
                                         if img_data != st.session_state.get(f"raw_cam_{task_key}"):
                                             st.session_state[f"raw_cam_{task_key}"] = img_data
                                             base64_str = img_data.split(',')[1]
                                             st.session_state.task_photos[task_key] = base64.b64decode(base64_str)
                                             st.rerun()
-                        idx_counter += 1
-                        if idx_counter % 2 == 0:
+                        idx_counter_dc += 1
+                        if idx_counter_dc % 2 == 0:
                             st.write("")
 
         can_submit = len(missing_tasks) == 0
