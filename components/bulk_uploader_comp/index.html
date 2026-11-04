@@ -124,11 +124,21 @@
         });
     }
 
-    // Initialize component
-    window.onload = function() {
-        sendMessageToStreamlitClient("streamlit:componentReady", {apiVersion: 1});
+    function sendHeight() {
         sendMessageToStreamlitClient("streamlit:setFrameHeight", {height: document.body.scrollHeight + 30});
-    };
+    }
+
+    // Initialize component
+    sendMessageToStreamlitClient("streamlit:componentReady", {apiVersion: 1});
+
+    window.addEventListener("message", function(event) {
+        if (event.data && event.data.type === "streamlit:render") {
+            sendHeight();
+        }
+    });
+
+    // Ensure height is set initially
+    setTimeout(sendHeight, 100);
   </script>
 </body>
 </html>
