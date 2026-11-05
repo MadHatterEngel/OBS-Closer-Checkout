@@ -67,6 +67,7 @@
         sendMessageToStreamlitClient("streamlit:setFrameHeight", {height: document.body.scrollHeight + 50});
 
         const compressedImages = [];
+        const errors = [];
 
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
@@ -79,11 +80,17 @@
                 }
             } catch (err) {
                 console.error("Error compressing image:", err);
+                errors.push(err.message || err.toString());
             }
         }
 
         if (compressedImages.length === 0) {
-            statusDiv.innerText = `Failed to process photos. Please try again.`;
+            let errorMsg = "Failed to process photos. Please try again.";
+            if (errors.length > 0) {
+                errorMsg += `\nError details: ${errors.join(', ')}`;
+            }
+            statusDiv.innerText = errorMsg;
+            sendMessageToStreamlitClient("streamlit:setFrameHeight", {height: document.body.scrollHeight + 50});
             return;
         }
 
@@ -95,27 +102,27 @@
 
     function compressImage(file) {
         return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = (event) => {
-                const img = new Image();
-                img.onload = () => {
-                    try {
-                        const canvas = document.createElement('canvas');
-                        let width = img.width;
-                        let height = img.height;
+            const img = new Image();
+            const objectUrl = URL.createObjectURL(file);
 
-                        const MAX_SIZE = 1080;
-                        if (width > height) {
-                            if (width > MAX_SIZE) {
-                                height *= MAX_SIZE / width;
-                                width = MAX_SIZE;
-                            }
-                        } else {
-                            if (height > MAX_SIZE) {
-                                width *= MAX_SIZE / height;
-                                height = MAX_SIZE;
-                            }
+            img.onload = () => {
+                try {
+                    URL.revokeObjectURL(objectUrl); // Clean up memory
+
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+
+                    const MAX_SIZE = 1080;
+                    if (width > height) {
+                        if (width > MAX_SIZE) {
+                            height *= MAX_SIZE / width;
+                            width = MAX_SIZE;
+                        }
+                    } else {
+                        if (height > MAX_SIZE) {
+                            width *= MAX_SIZE / height;
+                            height = MAX_SIZE;
                         }
 
                         canvas.width = width;
@@ -123,17 +130,20 @@
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, width, height);
 
-                        // Output as JPEG with 0.8 quality
-                        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
-                        resolve(compressedDataUrl);
-                    } catch (e) {
-                        reject(e);
-                    }
-                };
-                img.onerror = error => reject(error);
-                img.src = event.target.result;
+                    // Output as JPEG with 0.8 quality
+                    const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                    resolve(compressedDataUrl);
+                } catch (e) {
+                    reject(e);
+                }
             };
-            reader.onerror = error => reject(error);
+
+            img.onerror = (error) => {
+                URL.revokeObjectURL(objectUrl);
+                reject(new Error("Failed to load image into memory: " + error.toString()));
+            };
+
+            img.src = objectUrl;
         });
     }
 
