@@ -64,7 +64,7 @@
         if (files.length === 0) return;
 
         statusDiv.innerText = `Processing ${files.length} photos... please wait.`;
-        sendMessageToStreamlitClient("streamlit:setFrameHeight", {height: document.body.scrollHeight + 50});
+        sendMessageToStreamlitClient("streamlit:setFrameHeight", {height: Math.max(document.body.scrollHeight + 50, 100)});
 
         const compressedImages = [];
         const errors = [];
@@ -90,7 +90,7 @@
                 errorMsg += `\nError details: ${errors.join(', ')}`;
             }
             statusDiv.innerText = errorMsg;
-            sendMessageToStreamlitClient("streamlit:setFrameHeight", {height: document.body.scrollHeight + 50});
+            sendMessageToStreamlitClient("streamlit:setFrameHeight", {height: Math.max(document.body.scrollHeight + 50, 100)});
             return;
         }
 
@@ -124,11 +124,12 @@
                             width *= MAX_SIZE / height;
                             height = MAX_SIZE;
                         }
+                    }
 
-                        canvas.width = width;
-                        canvas.height = height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, width, height);
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
 
                     // Output as JPEG with 0.8 quality
                     const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
@@ -148,7 +149,7 @@
     }
 
     function sendHeight() {
-        sendMessageToStreamlitClient("streamlit:setFrameHeight", {height: document.body.scrollHeight + 30});
+        sendMessageToStreamlitClient("streamlit:setFrameHeight", {height: Math.max(document.body.scrollHeight + 30, 100)});
     }
 
     // Initialize component
