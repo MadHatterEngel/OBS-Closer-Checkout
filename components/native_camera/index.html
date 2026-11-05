@@ -72,52 +72,107 @@
       const fileInput = document.getElementById('file-input');
       const preview = document.getElementById('preview');
 
-      fileInput.addEventListener('change', (event) => {
+
+      fileInput.addEventListener('change', async (event) => {
         const file = event.target.files[0];
-        if (file) {
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const img = new Image();
-            img.onload = () => {
-              // Create a canvas to compress and resize the image
-              const canvas = document.createElement('canvas');
-              const MAX_WIDTH = 1080;
-              const MAX_HEIGHT = 1080;
-              let width = img.width;
-              let height = img.height;
+        if (!file) return;
 
-              // Calculate aspect ratio
-              if (width > height) {
-                if (width > MAX_WIDTH) {
-                  height *= MAX_WIDTH / width;
-                  width = MAX_WIDTH;
+        try {
+            let compressedDataUrl;
+
+            // Try createImageBitmap first (more memory efficient, works well in modern mobile Chrome)
+            if ('createImageBitmap' in window) {
+                try {
+                    const bitmap = await createImageBitmap(file);
+
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 1080;
+                    const MAX_HEIGHT = 1080;
+                    let width = bitmap.width;
+                    let height = bitmap.height;
+
+                    if (width > height) {
+                        if (width > MAX_WIDTH) {
+                            height *= MAX_WIDTH / width;
+                            width = MAX_WIDTH;
+                        }
+                    } else {
+                        if (height > MAX_HEIGHT) {
+                            width *= MAX_HEIGHT / height;
+                            height = MAX_HEIGHT;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(bitmap, 0, 0, width, height);
+
+                    compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                    bitmap.close();
+                } catch (e) {
+                    console.warn("createImageBitmap failed, falling back to Image object", e);
                 }
-              } else {
-                if (height > MAX_HEIGHT) {
-                  width *= MAX_HEIGHT / height;
-                  height = MAX_HEIGHT;
-                }
-              }
+            }
 
-              canvas.width = width;
-              canvas.height = height;
-              const ctx = canvas.getContext('2d');
-              ctx.drawImage(img, 0, 0, width, height);
+            if (!compressedDataUrl) {
+                // Fallback to Image object
+                compressedDataUrl = await new Promise((resolve, reject) => {
+                    const img = new Image();
+                    const objectUrl = URL.createObjectURL(file);
 
-              // Export as compressed JPEG (80% quality)
-              const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                    img.onload = () => {
+                        URL.revokeObjectURL(objectUrl);
+                        try {
+                            const canvas = document.createElement('canvas');
+                            const MAX_WIDTH = 1080;
+                            const MAX_HEIGHT = 1080;
+                            let width = img.width;
+                            let height = img.height;
 
-              // Show preview
-              preview.src = compressedDataUrl;
-              preview.style.display = 'block';
-              sendHeight();
+                            if (width > height) {
+                                if (width > MAX_WIDTH) {
+                                    height *= MAX_WIDTH / width;
+                                    width = MAX_WIDTH;
+                                }
+                            } else {
+                                if (height > MAX_HEIGHT) {
+                                    width *= MAX_HEIGHT / height;
+                                    height = MAX_HEIGHT;
+                                }
+                            }
 
-              // Send compressed, small payload to Streamlit
-              sendMessageToStreamlit("streamlit:setComponentValue", { value: compressedDataUrl });
-            };
-            img.src = e.target.result;
-          };
-          reader.readAsDataURL(file);
+                            canvas.width = width;
+                            canvas.height = height;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, width, height);
+
+                            resolve(canvas.toDataURL('image/jpeg', 0.8));
+                        } catch (e) {
+                            reject(e);
+                        }
+                    };
+
+                    img.onerror = () => {
+                        URL.revokeObjectURL(objectUrl);
+                        reject(new Error("Image decoding failed"));
+                    };
+
+                    img.src = objectUrl;
+                });
+            }
+
+            // Show preview
+            preview.src = compressedDataUrl;
+            preview.style.display = 'block';
+            sendHeight();
+
+            // Send compressed, small payload to Streamlit
+            sendMessageToStreamlit("streamlit:setComponentValue", { value: compressedDataUrl });
+
+        } catch (err) {
+            console.error("Error processing camera image:", err);
+            // Ideally send error back, but for now just log it
         }
       });
 
