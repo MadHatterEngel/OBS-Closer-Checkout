@@ -7,10 +7,8 @@
       margin: 0;
       padding: 0;
       background-color: transparent;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
+      text-align: center;
+      padding-top: 10px;
     }
     .upload-btn {
       background-color: #E2231A; /* Outback Red */
@@ -23,9 +21,11 @@
       cursor: pointer;
       width: 100%;
       max-width: 400px;
+      display: inline-block;
       text-align: center;
       box-shadow: 0px 2px 4px rgba(0,0,0,0.1);
       transition: background-color 0.2s;
+      box-sizing: border-box;
     }
     .upload-btn:hover {
       background-color: #C11B13;
@@ -67,15 +67,31 @@
         sendMessageToStreamlitClient("streamlit:setFrameHeight", {height: document.body.scrollHeight + 50});
 
         const compressedImages = [];
+        const errors = [];
 
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
 
             // Convert to base64 via canvas compression
-            const base64Data = await compressImage(file);
-            if (base64Data) {
-                compressedImages.push(base64Data);
+            try {
+                const base64Data = await compressImage(file);
+                if (base64Data) {
+                    compressedImages.push(base64Data);
+                }
+            } catch (err) {
+                console.error("Error compressing image:", err);
+                errors.push(err.message || err.toString());
             }
+        }
+
+        if (compressedImages.length === 0) {
+            let errorMsg = "Failed to process photos. Please try again.";
+            if (errors.length > 0) {
+                errorMsg += `\nError details: ${errors.join(', ')}`;
+            }
+            statusDiv.innerText = errorMsg;
+            sendMessageToStreamlitClient("streamlit:setFrameHeight", {height: document.body.scrollHeight + 50});
+            return;
         }
 
         statusDiv.innerText = `Successfully processed ${compressedImages.length} photos!`;
@@ -86,12 +102,13 @@
 
     function compressImage(file) {
         return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = (event) => {
-                const img = new Image();
-                img.src = event.target.result;
-                img.onload = () => {
+            const img = new Image();
+            const objectUrl = URL.createObjectURL(file);
+
+            img.onload = () => {
+                try {
+                    URL.revokeObjectURL(objectUrl); // Clean up memory
+
                     const canvas = document.createElement('canvas');
                     let width = img.width;
                     let height = img.height;
@@ -117,18 +134,42 @@
                     // Output as JPEG with 0.8 quality
                     const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
                     resolve(compressedDataUrl);
-                };
-                img.onerror = error => reject(error);
+                } catch (e) {
+                    reject(e);
+                }
             };
-            reader.onerror = error => reject(error);
+
+            img.onerror = (error) => {
+                URL.revokeObjectURL(objectUrl);
+                reject(new Error("Failed to load image into memory: " + error.toString()));
+            };
+
+            img.src = objectUrl;
         });
     }
 
-    // Initialize component
-    window.onload = function() {
+    function sendHeight() {
+        // Ensure a minimum height so the button doesn't get cut off on fast mobile loads
+        const height = Math.max(document.body.scrollHeight, 100);
+        sendMessageToStreamlitClient("streamlit:setFrameHeight", {height: height});
+    }
+
+    // Wrap initialization in DOMContentLoaded to ensure body exists for height calculation
+    document.addEventListener("DOMContentLoaded", () => {
+        // Initialize component
         sendMessageToStreamlitClient("streamlit:componentReady", {apiVersion: 1});
-        sendMessageToStreamlitClient("streamlit:setFrameHeight", {height: document.body.scrollHeight + 30});
-    };
+
+        window.addEventListener("message", function(event) {
+            if (event.data && event.data.type === "streamlit:render") {
+                sendHeight();
+            }
+        });
+
+        // Ensure height is set initially, try multiple times in case of rendering lag
+        sendHeight();
+        setTimeout(sendHeight, 100);
+        setTimeout(sendHeight, 500);
+    });
   </script>
 </body>
 </html>
