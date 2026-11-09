@@ -127,6 +127,10 @@
                     const img = new Image();
 
                     img.onload = () => {
+                    const objectUrl = URL.createObjectURL(file);
+
+                    img.onload = () => {
+                        URL.revokeObjectURL(objectUrl);
                         try {
                             const canvas = document.createElement('canvas');
                             const MAX_WIDTH = 1080;
@@ -158,6 +162,7 @@
                     };
 
                     img.onerror = () => {
+                        URL.revokeObjectURL(objectUrl);
                         reject(new Error("Image decoding failed"));
                     };
 

@@ -112,9 +112,51 @@ Error details: ${errors.join(', ')}`;
         sendMessageToStreamlitClient("streamlit:setComponentValue", {value: compressedImages});
     });
 
-    function compressImage(objectUrl) {
+    function compressImage(file) {
         return new Promise(async (resolve, reject) => {
             let img;
+            let objectUrl;
+
+            // Try createImageBitmap first (more memory efficient, works well in modern mobile Chrome)
+            if ('createImageBitmap' in window) {
+                try {
+                    const bitmap = await createImageBitmap(file);
+
+                    const canvas = document.createElement('canvas');
+                    let width = bitmap.width;
+                    let height = bitmap.height;
+
+                    const MAX_SIZE = 1080;
+                    if (width > height) {
+                        if (width > MAX_SIZE) {
+                            height *= MAX_SIZE / width;
+                            width = MAX_SIZE;
+                        }
+                    } else {
+                        if (height > MAX_SIZE) {
+                            width *= MAX_SIZE / height;
+                            height = MAX_SIZE;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(bitmap, 0, 0, width, height);
+
+                    const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                    bitmap.close();
+                    resolve(compressedDataUrl);
+                    return;
+                } catch (e) {
+                    console.warn("createImageBitmap failed, falling back to Image object", e);
+                    // Fall back to Image object
+                }
+            }
+
+            // Fallback to Image object
+            img = new Image();
+            objectUrl = URL.createObjectURL(file);
 
             // Try createImageBitmap first (more memory efficient)
             if ('createImageBitmap' in window) {
@@ -192,6 +234,7 @@ Error details: ${errors.join(', ')}`;
             };
 
             img.onerror = (error) => {
+                URL.revokeObjectURL(objectUrl);
                 reject(new Error("Failed to load image into memory: Image decoding failed"));
             };
 
