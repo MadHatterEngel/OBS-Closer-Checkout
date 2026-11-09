@@ -77,13 +77,19 @@
         const file = event.target.files[0];
         if (!file) return;
 
+        // CRITICAL FIX: Synchronously create the ObjectURL right now before any awaits
+        const objectUrl = URL.createObjectURL(file);
+
         try {
             let compressedDataUrl;
 
-            // Try createImageBitmap first (more memory efficient, works well in modern mobile Chrome)
+            // Try createImageBitmap first (more memory efficient)
             if ('createImageBitmap' in window) {
                 try {
-                    const bitmap = await createImageBitmap(file);
+                    // Fetch blob from the synchronous objectUrl
+                    const response = await fetch(objectUrl);
+                    const blob = await response.blob();
+                    const bitmap = await createImageBitmap(blob);
 
                     const canvas = document.createElement('canvas');
                     const MAX_WIDTH = 1080;
@@ -119,6 +125,8 @@
                 // Fallback to Image object
                 compressedDataUrl = await new Promise((resolve, reject) => {
                     const img = new Image();
+
+                    img.onload = () => {
                     const objectUrl = URL.createObjectURL(file);
 
                     img.onload = () => {
@@ -173,6 +181,8 @@
         } catch (err) {
             console.error("Error processing camera image:", err);
             // Ideally send error back, but for now just log it
+        } finally {
+            URL.revokeObjectURL(objectUrl);
         }
       });
 
